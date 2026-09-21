@@ -22,11 +22,11 @@
 
 ## Lab Structure
 
-> **PLACEHOLDER.** The lab section breakdown has not been defined.
+Placeholder — sections to be defined once content is confirmed with engineering:
 
-| Section | Title | Duration |
-|---------|-------|----------|
-| 5.x | TBD | TBD |
+| # | Title | Duration |
+|---|-------|----------|
+| 1 | TBD | TBD |
 
 ## Detailed Steps
 

@@ -20,11 +20,13 @@ OpenShift 5 extends its security and disconnected-operations story in three area
 
 ## Lab Structure
 
-| Section | Title | Duration |
-|---------|-------|----------|
-| 4.1 | oc mirror v2 Improvements | ~10 min |
-| 4.2 | Post-Quantum Cryptography | ~10 min |
-| 4.3 | Lightwell *(placeholder)* | TBD |
+Two confirmed sections plus one reserved slot, approximately 20 minutes for confirmed content:
+
+| # | Title | Duration |
+|---|-------|----------|
+| 1 | oc mirror v2 Improvements | 10 min |
+| 2 | Post-Quantum Cryptography | 10 min |
+| 3 | Lightwell (placeholder) | TBD |
 
 ## Detailed Steps
 

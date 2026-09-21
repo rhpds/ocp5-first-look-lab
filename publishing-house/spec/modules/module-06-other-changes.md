@@ -23,13 +23,13 @@
 
 ## Lab Structure
 
-> **PLACEHOLDER.** The section breakdown below reflects the identified topic areas only. Titles, time estimates, and whether each section is hands-on or observational are all TBD.
+Placeholder — topic areas identified, details TBD pending content confirmation:
 
-| Section | Title | Duration |
-|---------|-------|----------|
-| 6.1 | UI Changes | TBD |
-| 6.2 | Node Management Changes | TBD |
-| 6.3 | OpenShift Dedicated/Hyperscaler Availability *(placeholder)* | TBD |
+| # | Title | Duration |
+|---|-------|----------|
+| 1 | UI Changes | TBD |
+| 2 | Node Management Changes | TBD |
+| 3 | OpenShift Dedicated/Hyperscaler Availability (placeholder) | TBD |
 
 ## Detailed Steps
 
