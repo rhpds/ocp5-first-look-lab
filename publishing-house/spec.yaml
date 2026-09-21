@@ -118,8 +118,41 @@ approval_checklist:
     catalog_gap: ""
     design_overview: ""
     module_summaries: []
-    rcars_overlap_pct: null
-    rcars_top_matches: []
+    rcars_overlap_pct: 80
+    rcars_top_matches:
+      - title: "Taking MCP Servers to Production on OpenShift AI with the Red Hat MCP Registry"
+        ci_name: "published.openshift-mcp-lab.prod"
+        url: "https://catalog.demo.redhat.com/catalog?item=published.openshift-mcp-lab.prod"
+        relevance_score: 80
+        why_it_fits: "Covers MCP server deployment and governance on OpenShift AI with live AI tool calls and agentic workflows."
+        workloads:
+          - role: "ocp4_workload_litellm_virtual_keys"
+            collection: "rhpds.litellm_virtual_keys"
+          - role: "ocp4_workload_mcp_user"
+            collection: "rhpds.mcp_workloads"
+          - role: "ocp4_workload_mcp_with_openshift_validation"
+            collection: "rhpds.mcp_workloads"
+          - role: "ocp4_workload_toolhive"
+            collection: "agnosticd.ai_workloads"
+      - title: "OpenShift Lightspeed Demo"
+        ci_name: "published.ocp4-lightspeed.prod"
+        url: "https://catalog.demo.redhat.com/catalog?item=published.ocp4-lightspeed.prod"
+        relevance_score: 76
+        why_it_fits: "Covers MCP server extensibility, live AI tool calls, and agentic troubleshooting within OpenShift Lightspeed on OCP 4."
+        workloads:
+          - role: "ocp4_workload_lightspeed_demo"
+            collection: "rhpds.openshift_lightspeed_demo"
+          - role: "ocp4_workload_ols"
+            collection: "agnosticd.ai_workloads"
+      - title: "AgentOps in Production — AI Observability on OpenShift"
+        ci_name: "published.agentops-ocp.prod"
+        url: "https://catalog.demo.redhat.com/catalog?item=published.agentops-ocp.prod"
+        relevance_score: 69
+        why_it_fits: "MCP and agentic workflow topics partially overlap; focuses on AI observability for multi-agent systems on OpenShift AI."
+        workloads:
+          - role: "ocp4_workload_litellm_virtual_keys"
+            collection: "rhpds.litellm_virtual_keys"
+    catalog_gap: "This lab is the only catalog content covering OCP 5-specific capabilities: the 4→5 upgrade risk workflow, RHCOS 10 lifecycle, post-quantum cryptography on API server and ingress, Perses AI-generated dashboards, and oc mirror v2 delta mirroring. All existing MCP/agentic content targets OCP 4."
     rejections: []
 
   infra:
