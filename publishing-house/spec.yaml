@@ -20,7 +20,7 @@ project:
   workflow_id: "8d9ea05a-af2a-4df8-ac12-803dcb492f86"
 
 spec:
-  title: ""
+  title: "Red Hat OpenShift 5: First Look"
   learning_objectives: []
   modules: []              # [{id, title, duration_min}] — written by intake Phase 4; id is stable (e.g. module-01)
   environment:
@@ -46,17 +46,18 @@ spec:
 
     # --- Common fields (both platforms) ---
     aap_version: ""                    # required if AAP in products
-    ai_requirement: ""                 # maas | gpu | none
-    ai_model_tier: ""                  # open-source | frontier (if ai_requirement = maas or gpu)
+    ai_requirement: "maas"              # maas | gpu | none
+    ai_model_tier: "open-source"       # open-source | frontier (if ai_requirement = maas or gpu)
     ai_model_name: ""                  # specific model e.g. granite-3.1-8b
     ai_justification: ""               # required if ai_model_tier = frontier or ai_requirement = gpu
-    non_ga_products: []                # list of non-GA products/versions
+    non_ga_products:
+      - "Red Hat OpenShift Container Platform 5 (GA expected Oct 2026)"
     non_ga_access_plan: ""             # how access is provided for non-GA products
     external_services: []              # named external service dependencies e.g. [github.com]
     gpu_nodes: 0                       # number of GPU nodes (0 = none)
     gpu_type: ""                       # e.g. NVIDIA A100 40GB (required if gpu_nodes > 0)
-  duration_hours: null
-  audience: ""               # beginner | intermediate | advanced
+  duration_hours: 2
+  audience: "intermediate"   # beginner | intermediate | advanced
 
 development:
   automation:
