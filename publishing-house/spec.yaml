@@ -16,8 +16,8 @@ project:
   automation_type: "both"
   description: "Red Hat OpenShift 5: First Look Lab"
   # content_reviewer_email and infra_reviewer_email are assigned by the RHDP team — not set by the author
-  jira_ticket: ""
-  workflow_id: ""
+  jira_ticket: "RHDPCD-2035"
+  workflow_id: "8d9ea05a-af2a-4df8-ac12-803dcb492f86"
 
 spec:
   title: ""
