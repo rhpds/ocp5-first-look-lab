@@ -78,16 +78,16 @@ Intermediate
 
 ## Infrastructure Requirements
 
-- **Cloud provider:** TBD — confirmed in infrastructure phase
-- **Cluster type:** TBD — confirmed in infrastructure phase
-- **OCP version:** TBD — confirmed in infrastructure phase
-- **Topology:** TBD — confirmed in infrastructure phase
-- **Sizing:** TBD — confirmed in infrastructure phase
-- **Automation approach:** TBD — confirmed in infrastructure phase
-- **AI/MaaS:** TBD — confirmed in infrastructure phase
-- **External services:** TBD — confirmed in infrastructure phase
-- **AAP version:** TBD — confirmed in infrastructure phase
-- **Non-GA products:** TBD — confirmed in infrastructure phase
+- **Cloud provider:** CNV
+- **Cluster type:** Multinode
+- **OCP version:** 5.0 *(confirm exact version string at GA)*
+- **Topology:** Per-student
+- **Sizing:** 3 control plane nodes (16 vCPU, 64GB RAM each); 3 worker nodes (16 vCPU, 64GB RAM, 200GB disk each)
+- **Automation approach:** Ansible + GitOps (both)
+- **AI/MaaS:** MaaS, open-source model
+- **External services:** `registry.redhat.io`, `registry.access.redhat.com`, MaaS endpoint (TBD — confirm URL before submission)
+- **AAP version:** N/A
+- **Non-GA products:** Red Hat OpenShift Container Platform 5 (GA expected October 2026) — access via specific engineering build
 
 ## Assessment Strategy (Optional)
 
