@@ -11,7 +11,7 @@
 
 - **Target personas:** TBD (expected: Solutions Architects, Technical Sales, Field Engineers — consistent with the rest of the lab)
 - **Prerequisites for this module:** TBD
-- **Estimated duration:** TBD
+- **Estimated duration:** TBD — estimated 20-30 min pending content confirmation with engineering
 
 ## Learning Objectives
 

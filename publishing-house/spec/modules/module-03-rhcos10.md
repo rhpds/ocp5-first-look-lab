@@ -19,12 +19,14 @@ Red Hat CoreOS 10 (RHCOS 10) introduces an image-based lifecycle model powered b
 
 ## Lab Structure
 
-| Section | Title | Duration |
-|---------|-------|----------|
-| 3.1 | Inspecting Node OS Details | ~5 min |
-| 3.2 | Key RHCOS 10 Changes | ~5 min |
-| 3.3 | Day-2 OS Update Flow | ~3 min |
-| 3.4 | Immutability and Compliance | ~2 min |
+Four sections, approximately 15 minutes total:
+
+| # | Title | Duration |
+|---|-------|----------|
+| 1 | Inspecting Node OS Details | 5 min |
+| 2 | Key RHCOS 10 Changes | 5 min |
+| 3 | Day-2 OS Update Flow | 3 min |
+| 4 | Immutability and Compliance | 2 min |
 
 ## Detailed Steps
 

@@ -19,13 +19,15 @@ OpenShift 5 introduces architectural changes to the install and upgrade path, in
 
 ## Lab Structure
 
-| Section | Title | Duration |
-|---------|-------|----------|
-| 2.1 | Seamless 4→5 Upgrade (video/demo) | ~5 min |
-| 2.2 | Operator Update Planner | ~12 min |
-| 2.3 | Agent Installer Without External Registry | ~13 min |
-| 2.4 | vSphere Migration Operator *(placeholder)* | TBD |
-| 2.5 | Hyper-V and Nutanix Migration *(placeholder)* | TBD |
+Three confirmed sections plus two reserved slots, approximately 30 minutes for confirmed content:
+
+| # | Title | Duration |
+|---|-------|----------|
+| 1 | Seamless 4 to 5 Upgrade (video/demo) | 5 min |
+| 2 | Operator Update Planner | 12 min |
+| 3 | Agent Installer Without External Registry | 13 min |
+| 4 | vSphere Migration Operator (placeholder) | TBD |
+| 5 | Hyper-V and Nutanix Migration (placeholder) | TBD |
 
 ## Detailed Steps
 

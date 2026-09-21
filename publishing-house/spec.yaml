@@ -47,11 +47,11 @@ spec:
       duration_min: 20
       status: not_started
     - id: module-05
-      title: "Multi-Cluster (Placeholder)"
+      title: "Multi-Cluster *(placeholder)*"
       duration_min: null
       status: not_started
     - id: module-06
-      title: "Other Changes in OpenShift 5 (Placeholder)"
+      title: "Other Changes in OpenShift 5 *(placeholder)*"
       duration_min: null
       status: not_started
   environment:

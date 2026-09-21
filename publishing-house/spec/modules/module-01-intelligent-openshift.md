@@ -23,12 +23,14 @@ OpenShift 5 ships with an MCP (Model Context Protocol) server and gateway that e
 
 ## Lab Structure
 
-| Section | Title | Duration |
-|---------|-------|----------|
-| 1.1 | MCP Server and Gateway | ~8 min |
-| 1.2 | Agentic Troubleshooting | ~12 min |
-| 1.3 | On-Demand Perses Dashboards | ~10 min |
-| 1.4 | Update Risk and Status Analysis | ~5 min |
+Four sections, approximately 35 minutes total:
+
+| # | Title | Duration |
+|---|-------|----------|
+| 1 | MCP Server and Gateway | 8 min |
+| 2 | Agentic Troubleshooting | 12 min |
+| 3 | On-Demand Perses Dashboards | 10 min |
+| 4 | Update Risk and Status Analysis | 5 min |
 
 ## Detailed Steps
 
