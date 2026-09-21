@@ -1,0 +1,14 @@
+site_name: 'Red Hat OpenShift 5: First Look'
+docs_dir: publishing-house/spec
+nav:
+- Home: index.md
+- Design Spec: design.md
+- Modules:
+  - Module 1 - Intelligent Openshift: modules/module-01-intelligent-openshift.md
+  - Module 2 - Install Upgrade: modules/module-02-install-upgrade.md
+  - Module 3 - Rhcos10: modules/module-03-rhcos10.md
+  - Module 4 - Security: modules/module-04-security.md
+  - Module 5 - Multi Cluster: modules/module-05-multi-cluster.md
+  - Module 6 - Other Changes: modules/module-06-other-changes.md
+plugins:
+- techdocs-core
