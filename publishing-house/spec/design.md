@@ -1,4 +1,4 @@
-# [Project Title]
+# Red Hat OpenShift 5: First Look
 
 <!-- This file is the design document for your lab or demo. -->
 <!-- Fill in each section below, or run /rhdp-publishing-house to have the intake skill help. -->
@@ -7,83 +7,88 @@
 
 ## Overview
 
-[2-3 sentences on what this lab or demo is and why it exists. Then a direct description of what participants will do — specific enough that someone reading this section immediately understands the content without interpretation. No flowery language. Example: "Participants will deploy a 3-tier application on OpenShift, configure autoscaling, and troubleshoot a simulated pod failure."]
+This is a two-hour hands-on lab for Solutions Architects, Technical Sales, and Field Engineers who need to understand and demonstrate the key new capabilities of Red Hat OpenShift 5. OCP 5 introduces AI-assisted operations (MCP server, agentic troubleshooting, AI-generated dashboards), a redesigned upgrade path, RHCOS 10, and expanded security capabilities including post-quantum cryptography. Participants will connect an AI client to the OpenShift MCP gateway, drive an agentic troubleshooting workflow on a broken workload, generate and refine monitoring dashboards via natural language, analyze AI-produced upgrade risk reports, walk through a disconnected OCP 5 install, configure post-quantum crypto on the API server and ingress, and mirror Operator catalog content using oc mirror v2's delta capabilities.
 
 ## Target Audience
 
-- **Role:** [Data scientists, platform engineers, developers, etc.]
-- **Experience level:** [Beginner, intermediate, or advanced]
-- **What they already know:** [Existing skills and knowledge]
-- **What they don't know:** [Skills this lab teaches]
+- **Role:** Solutions Architects, Technical Sales, Field Engineers
+- **Experience level:** Intermediate
+- **What they already know:** OpenShift 4 administration concepts (deploying workloads, managing operators, oc CLI), familiarity with Kubernetes fundamentals
+- **What they don't know:** OpenShift 5 architecture changes, the MCP server and agentic operations model, RHCOS 10 lifecycle, oc mirror v2, post-quantum cryptography in OCP
 
 ## Prerequisites
 
-- [What the learner must know or have completed before starting]
-- [Can the lab validate these automatically? Yes/No — brief explanation]
-
-<!-- If no prerequisites, write "None" -->
+- OpenShift 4 operational experience (deploying and managing workloads, using oc CLI)
+- Basic familiarity with Kubernetes concepts (pods, operators, nodes)
+- No OCP 5 experience required
+- Prerequisites are trust-based — no automated pre-check is planned for this classic lab
 
 ## Learning Objectives
 
-1. [Action verb] [specific, measurable outcome]
-2. [Action verb] [specific, measurable outcome]
-3. [Action verb] [specific, measurable outcome]
-
-<!-- Scale to duration: up to 3 objectives per 45 min of content. Start with action verbs: Configure, Deploy, Create, Implement, Troubleshoot, Monitor, Scale. Each should be testable. NOT: Understand, Learn, Know. -->
+1. Explore the OpenShift 5 MCP server by connecting an AI client and invoking live tool calls against a running cluster
+2. Deploy an agentic troubleshooting workflow to diagnose a failing workload and apply AI-recommended remediation
+3. Create an AI-generated Perses monitoring dashboard using natural language prompts and refine it iteratively
+4. Analyze an AI-assisted upgrade risk report and Operator compatibility plan for an OCP 4→5 migration scenario
+5. Verify a disconnected OCP 5 installation using pre-staged, air-gapped content
+6. Configure post-quantum cryptography cipher suites on the OCP 5 API server and ingress controller
+7. Demonstrate oc mirror v2 delta mirroring to selectively synchronize Operator catalog content
 
 ## Content Type
 
-[Lab (hands-on) or Demo (presenter-led)]
+Lab (hands-on)
 
 ## Products & Technologies
 
-- [Official Red Hat product name with version if relevant]
-- [Additional products/technologies]
-
-<!-- Use official names: "Red Hat OpenShift", not "OpenShift". List upstream projects separately. -->
+- Red Hat OpenShift Container Platform 5 (primary — pre-GA, GA expected October 2026)
+- Red Hat OpenShift AI (MaaS endpoint for agentic operations in Module 1)
+- Red Hat Lightwell (Module 4.3 — placeholder, pending content confirmation)
+- Perses (upstream monitoring framework, Module 1.3 — used via OCP 5 console integration)
+- oc mirror v2 (OCP tooling, Module 4.1)
 
 ## Module Map
 
 | Module | Title | Duration |
 |--------|-------|----------|
-| 1 | [Module title] | [XX min] |
-| 2 | [Module title] | [XX min] |
-| — | **Total hands-on** | **[X hours]** |
-| — | Intro / presentation | [~XX min] |
-| — | **Total lab** | **[~X hours]** |
+| 1 | Intelligent OpenShift | 35 min |
+| 2 | Install & Upgrade | 30 min |
+| 3 | RHCOS 10 | 15 min |
+| 4 | Security, Sovereign & Disconnected | 20 min |
+| 5 | Multi-Cluster *(placeholder)* | TBD |
+| 6 | Other Changes in OpenShift 5 *(placeholder)* | TBD |
+| — | **Total confirmed hands-on** | **~100 min** |
+| — | Intro / orientation | ~10 min |
+| — | **Total confirmed lab** | **~2 hours** |
 
-<!-- Each module 10-30 min. Total: lab 1-4 hours, demo 15-45 min. Modules should build on each other. -->
+> **Note:** Modules 5 and 6 (and sub-items 2.4, 2.5, 4.3) are reserved slots pending content confirmation with engineering. The confirmed lab runs ~2 hours; total duration will increase when placeholders are filled in.
 
 ## Difficulty Level
 
-[Beginner, Intermediate, or Advanced]
+Intermediate
 
 ## Environment
 
-**Learner view:** [What exists when the lab starts — pre-deployed resources, what participants see and interact with. Be specific about cluster details.]
+**Learner view:** When the lab starts, participants have access to a pre-deployed OCP 5 cluster with:
+- A sample workload in a broken state (CrashLoopBackOff + misconfigured resource limits) for Module 1.2
+- The OpenShift MCP gateway configured and exposed, ready for AI client connection
+- A MaaS endpoint pre-configured and accessible for agentic operations
+- Pre-staged disconnected content mirrored to an internal registry for Module 2.3
+- All required Operators installed
 
-**Automation needed:** [Yes/No]
-
-[If yes, list what automation must provision — operators, per-user resources, sample apps, data sets.]
+**Automation needed:** Yes — automation must provision the broken workload (Module 1.2), configure the MaaS endpoint, pre-mirror content for the air-gapped install walkthrough (Module 2.3), and stage any Module 2.4/2.5 placeholder resources when content is confirmed.
 
 ## Infrastructure Requirements
 
-- **Cloud provider:** [CNV (default), AWS, or Troshka (bare-metal/nested virt)]
-- **Cluster type:** [Multinode or SNO (Single Node OpenShift)]
-- **OCP version:** [e.g. 4.20 — minimum 4.20]
-- **Topology:** [Shared cluster, per-student, or CNV pool]
-- **Sizing:** [Node types and counts with resources — e.g., "3 control plane (16 CPU, 64GB RAM), 6 workers (8 CPU, 32GB RAM, 100GB disk)"]
-- **Automation approach:** [Ansible, GitOps (Helm + ArgoCD), or combo]
-- **AI/MaaS:** [None, MaaS (open-source model), MaaS (frontier model), or dedicated GPU — include justification if not "none"]
-- **External services:** [Named services — e.g., github.com, registry.access.redhat.com — or "None"]
-- **AAP version:** [e.g. 2.5 — only if AAP is in products; omit otherwise]
-- **Non-GA products:** [Product name + version, with access plan — or "None (all products are GA)"]
-
-<!-- Not all fields must be known at intake. "TBD, estimating ~X" is fine. -->
+- **Cloud provider:** TBD — confirmed in infrastructure phase
+- **Cluster type:** TBD — confirmed in infrastructure phase
+- **OCP version:** TBD — confirmed in infrastructure phase
+- **Topology:** TBD — confirmed in infrastructure phase
+- **Sizing:** TBD — confirmed in infrastructure phase
+- **Automation approach:** TBD — confirmed in infrastructure phase
+- **AI/MaaS:** TBD — confirmed in infrastructure phase
+- **External services:** TBD — confirmed in infrastructure phase
+- **AAP version:** TBD — confirmed in infrastructure phase
+- **Non-GA products:** TBD — confirmed in infrastructure phase
 
 ## Assessment Strategy (Optional)
 
-<!-- Optional — skip this section for demos or classic labs without verification. -->
-<!-- Relevant for Zero-Touch labs with solve/validate buttons or labs with automated checks. -->
-
-[If applicable: how will we know the learner successfully completed each module? Per module: verification script, solve/validate button, visible result in the UI, or automated check.]
+Trust-based — this is a classic Showroom lab with no automated solve/validate buttons. Completion is self-reported. Per-module verification is through visible UI results and terminal output that participants can observe and confirm during the lab.

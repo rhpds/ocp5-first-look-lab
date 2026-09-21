@@ -21,8 +21,39 @@ project:
 
 spec:
   title: "Red Hat OpenShift 5: First Look"
-  learning_objectives: []
-  modules: []              # [{id, title, duration_min}] — written by intake Phase 4; id is stable (e.g. module-01)
+  learning_objectives:
+    - "Explore the OpenShift 5 MCP server by connecting an AI client and invoking live tool calls against a running cluster"
+    - "Deploy an agentic troubleshooting workflow to diagnose a failing workload and apply AI-recommended remediation"
+    - "Create an AI-generated Perses monitoring dashboard using natural language prompts and refine it iteratively"
+    - "Analyze an AI-assisted upgrade risk report and Operator compatibility plan for an OCP 4→5 migration scenario"
+    - "Verify a disconnected OCP 5 installation using pre-staged, air-gapped content"
+    - "Configure post-quantum cryptography cipher suites on the OCP 5 API server and ingress controller"
+    - "Demonstrate oc mirror v2 delta mirroring to selectively synchronize Operator catalog content"
+  modules:
+    - id: module-01
+      title: "Intelligent OpenShift"
+      duration_min: 35
+      status: not_started
+    - id: module-02
+      title: "Install & Upgrade"
+      duration_min: 30
+      status: not_started
+    - id: module-03
+      title: "RHCOS 10"
+      duration_min: 15
+      status: not_started
+    - id: module-04
+      title: "Security, Sovereign & Disconnected"
+      duration_min: 20
+      status: not_started
+    - id: module-05
+      title: "Multi-Cluster (Placeholder)"
+      duration_min: null
+      status: not_started
+    - id: module-06
+      title: "Other Changes in OpenShift 5 (Placeholder)"
+      duration_min: null
+      status: not_started
   environment:
     platform: ""               # ocp | rhel-vms — determines which sizing fields apply
     topology: ""               # shared-cluster | per-student | cnv-pool
@@ -82,7 +113,7 @@ tracking:
 approval_checklist:
 
   content:
-    prerequisites_verifiable: null
+    prerequisites_verifiable: false
     assessment_strategy: ""
     catalog_gap: ""
     design_overview: ""
