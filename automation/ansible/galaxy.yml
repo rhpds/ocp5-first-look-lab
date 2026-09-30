@@ -1,0 +1,10 @@
+---
+namespace: "ocp5_first_look_lab"
+name: "automation"
+version: "1.0.0"
+readme: README.md
+authors:
+  - "gmidha1 gmidha@redhat.com"
+description: "Starter collection for this project's custom Ansible automation."
+license: []
+repository: "https://github.com/rhpds/ocp5-first-look-lab"
