@@ -1,9 +1,18 @@
-name: Deploy to GitHub Pages
+name: github pages
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+    paths:
+      - 'content/**'
+      - 'site.yml'
+      - '.github/workflows/gh-pages.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'content/**'
+      - 'site.yml'
+      - '.github/workflows/gh-pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -12,42 +21,36 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: gh-pages
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: checkout
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
+      - name: setup node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Install Antora
-        run: |
-          npm install -g @antora/cli@3 @antora/site-generator@3 \
-            @sntke/antora-mermaid-extension \
-            @andrew-jones/antora-tabs-extension
-
-      - name: Build site
-        run: antora site.yml --to-dir www
-
-      - name: Upload Pages artifact
+          node-version: '22'
+      - name: install antora
+        run: npm i -g @antora/cli@3.1.15 @antora/site-generator@3.1.15 @sntke/antora-mermaid-extension@0.0.13 @andrew-jones/antora-tabs-extension@1.0.0
+      - name: antora generate
+        run: antora --fetch site.yml
+      - name: upload pages artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: www
-
   deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
-    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+    - name: deploy github pages
+      id: deployment
+      uses: actions/deploy-pages@v4
