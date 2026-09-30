@@ -1,7 +1,7 @@
 ---
 site:
-  title: My Project
-  url: https://github.com/rhpds/my-project
+  title: Red Hat OpenShift 5 - First Look
+  url: https://github.com/rhpds/ocp5-first-look-lab
   start_page: modules::index.adoc
 
 content:

@@ -9,8 +9,11 @@ view_switcher:
   default_mode: split
 
 tabs:
-  - name: ">_ terminal"
+  - name: OCP Console
+    url: 'https://console-openshift-console.${DOMAIN}'
+  - name: ">_ Terminals"
     path: /wetty
     port: 443
-  - name: Placeholder
-    url: /placeholder
+    secondary_name: OCP Terminal
+    secondary_path: /codeserver
+    secondary_port: 443
