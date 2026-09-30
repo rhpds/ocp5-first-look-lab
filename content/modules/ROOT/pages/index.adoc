@@ -3,8 +3,8 @@
 
 == Lab Overview
 
-This two-hour hands-on lab introduces the key capabilities of Red Hat OpenShift {ocp_version}.
-You work directly on a pre-deployed OCP {ocp_version} cluster and complete four confirmed modules covering AI-assisted operations, the redesigned install and upgrade path, RHCOS 10's image-based lifecycle, and the expanded security stack.
+This two-hour hands-on lab introduces the key capabilities of Red Hat OpenShift 5.
+You work directly on a pre-deployed OCP 5 cluster and complete four confirmed modules covering AI-assisted operations, the redesigned install and upgrade path, RHCOS 10's image-based lifecycle, and the expanded security stack.
 
 [cols="1,3,1",options="header"]
 |===
@@ -60,7 +60,7 @@ Completing this lab gives you hands-on evidence for each of these areas — not 
 
 The lab environment provides everything:
 
-* A pre-deployed OCP {ocp_version} multinode cluster
+* A pre-deployed OCP 5 multinode cluster
 * The MCP gateway pre-exposed and accessible from the lab terminal
 * A MaaS endpoint pre-configured for agentic operations
 * A pre-broken workload for the agentic troubleshooting exercise
