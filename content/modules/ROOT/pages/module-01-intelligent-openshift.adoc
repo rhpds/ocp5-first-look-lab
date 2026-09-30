@@ -1,1 +1,522 @@
 = Intelligent OpenShift
+
+OpenShift {ocp_version} treats AI as a first-class operational layer — built into the platform, not bolted on.
+The MCP (Model Context Protocol) server ships as part of the control plane and exposes live cluster data as structured, AI-callable tools.
+Any MCP-compatible AI client can connect to the gateway and invoke these tools to query cluster state, run diagnostic workflows, and generate operational artifacts — without requiring direct Kubernetes API access from every tool or script.
+
+This module covers four exercises that demonstrate Intelligent OpenShift in action.
+
+[cols="1,2,1",options="header"]
+|===
+| Section | Topic | Time
+
+| 1
+| MCP Server and Gateway
+| 8 min
+
+| 2
+| Agentic Troubleshooting
+| 12 min
+
+| 3
+| On-Demand Perses Dashboards
+| 10 min
+
+| 4
+| Update Risk and Status Analysis
+| 5 min
+|===
+
+== Learning Objectives
+
+By the end of this module you will be able to:
+
+* Connect an AI client to the OpenShift {ocp_version} MCP gateway and invoke live tool calls against a running cluster
+* Interpret MCP gateway routing and identify which tools the server exposes
+* Drive an agentic troubleshooting workflow that detects a failing workload, gathers diagnostics, and proposes a remediation
+* Apply an AI-recommended fix and verify workload recovery
+* Generate a Perses monitoring dashboard scoped to a workload namespace using a natural language prompt
+* Apply and inspect an AI-generated dashboard in the OpenShift console
+* Refine a dashboard through iterative natural language prompting
+* Interpret an AI-assisted upgrade risk report and cross-reference it with live cluster state
+
+== Section 1: MCP Server and Gateway
+
+=== What Is the MCP Server?
+
+The OpenShift MCP server exposes cluster resources as named, versioned tools.
+When an AI client connects to the MCP gateway, it receives a tool manifest describing available operations — for example, `list-nodes`, `describe-resource`, and `get-events`.
+The client calls these tools by name.
+The gateway authenticates the request, routes it to the correct cluster resource, and returns structured JSON.
+
+This design decouples the AI client from the Kubernetes API.
+Cluster administrators control which tools are exposed and how requests are authenticated at the gateway layer.
+AI clients get rich, contextual cluster data without needing wide API permissions.
+
+=== What You Need
+
+The lab environment pre-configures:
+
+* The MCP gateway, exposed at the URL shown in your *Lab Credentials* panel
+* An MCP-compatible AI client (`mcp-client`), available in the lab terminal
+* Your cluster credentials, pre-loaded into the client configuration
+
+=== Exercise 1.1: Connect to the MCP Gateway and Invoke Tool Calls
+
+. Open a terminal in the lab environment.
+
+. Set the gateway URL from your *Lab Credentials* panel as an environment variable:
++
+[source,bash,role="execute"]
+----
+export MCP_GATEWAY_URL=<your-mcp-gateway-url-from-credentials-panel>
+----
+
+. Verify the gateway is reachable:
++
+[source,bash,role="execute"]
+----
+curl -sk "${MCP_GATEWAY_URL}/health" | jq .
+----
++
+Expected output:
++
+[source,json]
+----
+{
+  "status": "ok",
+  "server": "openshift-mcp",
+  "version": "1.0"
+}
+----
+
+. List the tools the MCP server exposes:
++
+[source,bash,role="execute"]
+----
+mcp-client --server "${MCP_GATEWAY_URL}" list-tools
+----
++
+Review the tool manifest.
+Note entries such as `list-nodes`, `describe-resource`, `get-events`, `generate-dashboard`, and `upgrade-risk-scan`.
+Each tool entry includes a name, a short description, and an input schema.
+
+. Invoke your first live tool call — list all nodes in the cluster:
++
+[source,bash,role="execute"]
+----
+mcp-client --server "${MCP_GATEWAY_URL}" call list-nodes
+----
++
+The gateway returns structured JSON describing each node: its name, status, roles, and resource capacity.
+This data is fetched live from the cluster, but your client did not call `kubectl get nodes` or the Kubernetes API directly.
+The gateway handled authentication and routing.
+
+. Invoke the `describe-resource` tool against the pre-broken pod in the `lab-workloads` namespace:
++
+[source,bash,role="execute"]
+----
+mcp-client --server "${MCP_GATEWAY_URL}" call describe-resource \
+  --kind Pod \
+  --namespace lab-workloads \
+  --selector app=demo-app
+----
++
+The structured response includes the pod spec, current status, container states, and resource requests and limits — returned as a single JSON object.
+
+. Query recent events for the `lab-workloads` namespace:
++
+[source,bash,role="execute"]
+----
+mcp-client --server "${MCP_GATEWAY_URL}" call get-events \
+  --namespace lab-workloads
+----
++
+Review the event list.
+Events describing `BackOff` and resource-related failures appear in the output alongside their timestamps and source components.
+Note how the tool returns context the AI client can reason over without the operator manually gathering it first.
+
+=== Verify
+
+Confirm you are connected to the gateway and the full tool manifest is accessible:
+
+[source,bash,role="execute"]
+----
+mcp-client --server "${MCP_GATEWAY_URL}" list-tools | jq '[.[].name]'
+----
+
+Expected output includes at minimum:
+
+[source,json]
+----
+[
+  "list-nodes",
+  "describe-resource",
+  "get-events",
+  "upgrade-risk-scan",
+  "generate-dashboard"
+]
+----
+
+If you see the tool list, the gateway is connected and responding correctly.
+Move on to Section 2.
+
+== Section 2: Agentic Troubleshooting
+
+=== Background
+
+Agentic troubleshooting in OpenShift {ocp_version} combines MCP tool calls with an AI model's reasoning to automate the detection-diagnosis-remediation loop.
+The agent observes cluster state through tool calls, identifies the root cause of a failure, and proposes a concrete fix — without requiring the operator to manually correlate logs, events, and resource definitions.
+
+The lab environment provisions a broken workload in the `lab-workloads` namespace before this exercise begins.
+The `demo-app` deployment is stuck in `CrashLoopBackOff` because its memory limit is set far too low for the application to start.
+You did not create this workload; the lab automation did.
+Your job is to let the agent find it, diagnose it, and recommend the fix.
+
+=== Exercise 2.1: Run the Agentic Troubleshooting Workflow
+
+. Confirm the broken workload is present:
++
+[source,bash,role="execute"]
+----
+oc get pods -n lab-workloads
+----
++
+Expected output:
++
+[source,text]
+----
+NAME                        READY   STATUS             RESTARTS   AGE
+demo-app-7d8f9b4c6-xk2pq   0/1     CrashLoopBackOff   5          4m
+----
+
+. Examine the deployment's current resource configuration:
++
+[source,bash,role="execute"]
+----
+oc get deployment demo-app -n lab-workloads \
+  -o jsonpath='{.spec.template.spec.containers[0].resources}' | jq .
+----
++
+Note the limits and requests.
+The memory limit is deliberately set too low — the container exits before it can initialize.
+
+. Invoke the agentic troubleshooting workflow through the AI client:
++
+[source,bash,role="execute"]
+----
+mcp-client --server "${MCP_GATEWAY_URL}" agent troubleshoot \
+  --namespace lab-workloads \
+  --workload demo-app
+----
++
+Watch the agent work through three steps:
++
+--
+.. *Detection* — The agent calls `get-events` and `describe-resource` to identify the `CrashLoopBackOff` condition and the container exit code.
+.. *Diagnosis* — The agent correlates the exit code with the memory limit configuration and confirms the container is OOM-killed before it can start.
+.. *Remediation proposal* — The agent generates corrected resource values based on the application's observed memory footprint and returns a ready-to-run `oc set resources` command.
+--
+
+. Review the agent output.
+The final section shows a proposed remediation command.
+It will resemble the following (exact values come from the agent):
++
+[source,bash]
+----
+oc set resources deployment demo-app -n lab-workloads \
+  --limits=cpu=500m,memory=512Mi \
+  --requests=cpu=100m,memory=128Mi
+----
+
+. Apply the recommended fix:
++
+[source,bash,role="execute"]
+----
+oc set resources deployment demo-app -n lab-workloads \
+  --limits=cpu=500m,memory=512Mi \
+  --requests=cpu=100m,memory=128Mi
+----
+
+. Watch the pod recover.
+The deployment controller creates a new pod with the updated limits:
++
+[source,bash,role="execute"]
+----
+oc get pods -n lab-workloads -w
+----
++
+Wait until the new pod shows `1/1 Running` in the output, then press kbd:[Ctrl+C] to exit the watch.
+
+. Run a final agent status check to confirm the workload is healthy:
++
+[source,bash,role="execute"]
+----
+mcp-client --server "${MCP_GATEWAY_URL}" agent status \
+  --namespace lab-workloads \
+  --workload demo-app
+----
++
+The agent confirms the workload is running, resource limits match the recommended values, and no active warnings remain.
+
+=== Verify
+
+Confirm the `demo-app` pod is running and healthy:
+
+[source,bash,role="execute"]
+----
+oc get pods -n lab-workloads -l app=demo-app
+----
+
+Expected output:
+
+[source,text]
+----
+NAME                        READY   STATUS    RESTARTS   AGE
+demo-app-5c9f8a7d1-np8sz   1/1     Running   0          1m
+----
+
+The `RESTARTS` column should be `0` for the new pod — the rollout creates a fresh pod with the corrected limits.
+If the pod is still in `CrashLoopBackOff`, wait 30 seconds and re-run the command.
+
+== Section 3: On-Demand Perses Dashboards
+
+=== Background
+
+Perses is the cloud-native monitoring dashboard framework integrated into OpenShift {ocp_version}.
+Instead of hand-authoring dashboard YAML, you prompt the MCP `generate-dashboard` tool with a natural language description of the workload you want to monitor.
+The tool produces dashboard YAML scoped to a specific namespace and label selector, which you apply directly to the cluster.
+
+The Perses dashboard renders inside the OpenShift console under *Observe → Dashboards*, displaying live metrics from the cluster's Prometheus stack.
+
+=== Exercise 3.1: Generate and Apply a Perses Dashboard
+
+. Submit a natural language prompt to generate a Perses dashboard for the `demo-app` workload and save the output to a file:
++
+[source,bash,role="execute"]
+----
+mcp-client --server "${MCP_GATEWAY_URL}" call generate-dashboard \
+  --prompt "Create a Perses dashboard for the demo-app deployment in the lab-workloads namespace. Show CPU usage, memory usage, HTTP request rate, and pod restart count over the last hour." \
+  --output yaml > demo-app-dashboard.yaml
+----
+
+. Inspect the generated dashboard definition before applying it:
++
+[source,bash,role="execute"]
+----
+cat demo-app-dashboard.yaml
+----
++
+Review:
++
+--
+* The `spec.datasources` section — confirms the Prometheus data source is wired up
+* The `spec.panels` array — one panel per metric (CPU, memory, request rate, restart count)
+* The label selectors on each panel — they target `app=demo-app` in the `lab-workloads` namespace
+--
+
+. Apply the dashboard to the cluster:
++
+[source,bash,role="execute"]
+----
+oc apply -f demo-app-dashboard.yaml
+----
++
+Expected output:
++
+[source,text]
+----
+dashboard.perses.dev/demo-app-dashboard created
+----
+
+. Open the OpenShift console and navigate to *Observe → Dashboards*.
+Locate the *demo-app* dashboard in the list and open it.
+Confirm that live metrics appear in each of the four panels.
+
+. Submit a refinement prompt to add a network I/O panel to the existing dashboard:
++
+[source,bash,role="execute"]
+----
+mcp-client --server "${MCP_GATEWAY_URL}" call generate-dashboard \
+  --prompt "Add a network bytes received and transmitted panel to the demo-app dashboard for the lab-workloads namespace." \
+  --base-dashboard demo-app-dashboard.yaml \
+  --output yaml > demo-app-dashboard-v2.yaml
+----
+
+. Apply the refined dashboard:
++
+[source,bash,role="execute"]
+----
+oc apply -f demo-app-dashboard-v2.yaml
+----
+
+. Reload the *demo-app* dashboard in the OpenShift console.
+The updated dashboard now includes the network I/O panel alongside the original four panels.
+You iterated on the dashboard definition without touching any YAML directly.
+
+=== Verify
+
+Confirm the Perses dashboard resource is present on the cluster:
+
+[source,bash,role="execute"]
+----
+oc get dashboard -n lab-workloads
+----
+
+Expected output:
+
+[source,text]
+----
+NAME                 AGE
+demo-app-dashboard   2m
+----
+
+If the resource is not found, confirm the Perses Operator is running:
+
+[source,bash,role="execute"]
+----
+oc get csv -n openshift-perses
+----
+
+All entries should show `Succeeded` in the `PHASE` column.
+
+== Section 4: Update Risk and Status Analysis
+
+=== Background
+
+Before starting an OCP upgrade — especially a major version upgrade from 4 to {ocp_version} — operators need to know which installed Operators are compatible with the target version, which have blocking conditions that prevent the upgrade, and what remediation steps resolve those conditions.
+
+The MCP server's `upgrade-risk-scan` tool queries the cluster's installed Operators, checks them against the OCP {ocp_version} compatibility catalog, and returns a structured upgrade risk report.
+This exercise runs that scan and walks through interpreting the results.
+
+=== Exercise 4.1: Run the Upgrade Risk Scan
+
+. Invoke the upgrade risk scan tool against the cluster and save the output:
++
+[source,bash,role="execute"]
+----
+mcp-client --server "${MCP_GATEWAY_URL}" call upgrade-risk-scan \
+  --target-version {ocp_version} \
+  --output json > upgrade-risk-report.json
+----
++
+The scan checks each installed Operator against the compatibility catalog.
+On the lab cluster, expect it to take 30–60 seconds.
+
+. Review the high-level summary from the report:
++
+[source,bash,role="execute"]
+----
+jq '.summary' upgrade-risk-report.json
+----
++
+Expected output structure:
++
+[source,json]
+----
+{
+  "target_version": "{ocp_version}",
+  "blocking_count": 1,
+  "warning_count": 2,
+  "compatible_count": 14,
+  "scanned_at": "2026-09-30T..."
+}
+----
+
+. Review the full report structure.
+The report contains four sections:
++
+--
+* *Blocking conditions* — Operators incompatible with OCP {ocp_version} that must be resolved before the upgrade can proceed
+* *Warnings* — Operators that may require attention after the upgrade completes
+* *Recommended actions* — Specific steps (update channel, pin version, uninstall) for each blocking condition
+* *Compatible Operators* — Operators confirmed as compatible with the target version
+--
++
+[source,bash,role="execute"]
+----
+jq '.blocking_conditions' upgrade-risk-report.json
+----
+
+. Identify the blocking condition listed in the report.
+Note the Operator name, the reason for incompatibility, and the recommended action.
+In a real upgrade scenario, you would resolve each blocking condition before triggering the upgrade controller.
+
+. Cross-reference the report with the actual cluster state to confirm the report reflects reality:
++
+[source,bash,role="execute"]
+----
+oc get clusteroperators
+----
++
+Compare the cluster operator statuses with the conditions listed in the risk report.
+Any cluster operator not showing `AVAILABLE=True  PROGRESSING=False  DEGRADED=False` needs attention before an upgrade.
+
+=== Verify
+
+Confirm the report was generated and the summary is readable:
+
+[source,bash,role="execute"]
+----
+jq '.summary.target_version' upgrade-risk-report.json
+----
+
+Expected output:
+
+[source,text]
+----
+"{ocp_version}"
+----
+
+Confirm all cluster operators are in a healthy state in the lab environment:
+
+[source,bash,role="execute"]
+----
+oc get clusteroperators | grep -v "True.*False.*False"
+----
+
+The only line in the output should be the column header.
+If any cluster operator appears below it, check its status with `oc describe clusteroperator <name>` before proceeding.
+
+== Learning Outcomes Checkpoint
+
+Take a moment to review what you accomplished in this module.
+
+[cols="3,3",options="header"]
+|===
+| Objective | Evidence
+
+| Connected an AI client to the MCP gateway
+| `mcp-client list-tools` returned the full tool manifest with at least five tools
+
+| Invoked live tool calls
+| `list-nodes`, `describe-resource`, and `get-events` returned structured cluster data without direct API calls
+
+| Ran an agentic troubleshooting workflow
+| Agent detected `CrashLoopBackOff`, diagnosed the misconfigured memory limit, and proposed corrected values
+
+| Applied the AI-recommended fix and verified recovery
+| `demo-app` pod reached `1/1 Running` with `RESTARTS=0` after applying the corrected resource limits
+
+| Generated a Perses dashboard via natural language
+| `dashboard.perses.dev/demo-app-dashboard` created; live metrics visible in *Observe → Dashboards*
+
+| Refined the dashboard iteratively
+| Second prompt added a network I/O panel; `oc apply` updated the dashboard without manual YAML edits
+
+| Interpreted an upgrade risk report
+| Report summary showed blocking count, warnings, and compatible Operators; cross-referenced with `oc get clusteroperators`
+|===
+
+If you did not complete one of the steps, revisit the relevant exercise and verify section before moving on.
+
+== Conclusion
+
+Intelligent OpenShift changes how operators interact with a running cluster.
+Instead of manually correlating logs, events, and resource definitions across multiple CLI commands, the MCP server puts that data into a format that AI clients can query and reason over directly.
+The result is shorter troubleshooting loops, monitoring dashboards that appear on demand, and upgrade risk surfaced before the upgrade begins.
+
+The capabilities in this module — MCP gateway, agentic troubleshooting, Perses dashboard generation, and upgrade risk scanning — all ship as standard platform features in OpenShift {ocp_version}.
+No additional agents, sidecars, or third-party tooling required.
+
+Continue to the next module: xref:module-02-install-and-upgrade.adoc[Install & Upgrade].
