@@ -1,0 +1,12 @@
+---
+apiVersion: sailoperator.io/v1
+kind: IstioCNI
+metadata:
+  name: default
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  {{- if .Values.istio.version }}
+  version: {{ .Values.istio.version }}
+  {{- end }}
+  namespace: {{ .Values.istio.cniNamespace }}

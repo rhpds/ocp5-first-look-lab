@@ -1,0 +1,5 @@
+apiVersion: v2
+name: mock-mcp-servers
+description: Mock MCP servers for gateway testing (inventory, payments, accounts)
+type: application
+version: 0.1.0

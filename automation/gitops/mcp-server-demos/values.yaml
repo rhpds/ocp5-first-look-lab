@@ -1,0 +1,8 @@
+logDemo:
+  namespace: mcp-demo-logs
+
+metricsDemo:
+  namespace: mcp-demo-production
+
+netedgeDemo:
+  namespace: mcp-demo-network

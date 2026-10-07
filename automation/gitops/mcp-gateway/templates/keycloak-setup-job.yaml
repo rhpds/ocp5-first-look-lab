@@ -1,0 +1,223 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-mcp-setup
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    metadata:
+      labels:
+        app: keycloak-mcp-setup
+    spec:
+      serviceAccountName: keycloak-mcp-setup
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: setup
+          image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -eo pipefail
+
+              REALM="{{ .Values.keycloak.realm }}"
+              CLIENT_ID="{{ .Values.keycloak.clientId }}"
+              CLIENT_SECRET="{{ .Values.keycloak.clientSecret }}"
+              SERVER_NS="{{ .Values.keycloak.serverNamespace }}"
+
+              SSO_URL="https://sso.{{ .Values.gateway.clusterSubdomain }}"
+              echo "Keycloak URL: ${SSO_URL}"
+
+              # Get admin credentials from secret
+              ADMIN_USER=$(oc get secret keycloak-initial-admin -n keycloak -o jsonpath='{.data.username}' | base64 -d)
+              ADMIN_PASS=$(oc get secret keycloak-initial-admin -n keycloak -o jsonpath='{.data.password}' | base64 -d)
+
+              # Get admin token
+              ADMIN_TOKEN=$(curl -sk -X POST "${SSO_URL}/realms/master/protocol/openid-connect/token" \
+                -d "grant_type=password&client_id=admin-cli&username=${ADMIN_USER}&password=${ADMIN_PASS}" | \
+                python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+              # Set access token lifespan to 8 hours for EAP testing
+              curl -sk -X PUT "${SSO_URL}/admin/realms/${REALM}" \
+                -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d '{"accessTokenLifespan": 28800}'
+
+              # Helper: get or create client, return internal ID (logs to stderr)
+              get_or_create_client() {
+                local CID="$1" PUBLIC="$2" SECRET="$3" DIRECT="$4" FULL_SCOPE="$5"
+                local EXISTING=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/clients?clientId=${CID}" \
+                  -H "Authorization: Bearer ${ADMIN_TOKEN}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if d else '')")
+                if [ -z "$EXISTING" ]; then
+                  echo "Creating client ${CID}..." >&2
+                  curl -sk -X POST "${SSO_URL}/admin/realms/${REALM}/clients" \
+                    -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"clientId\":\"${CID}\",\"enabled\":true,\"publicClient\":${PUBLIC},\"secret\":\"${SECRET}\",\"directAccessGrantsEnabled\":${DIRECT},\"standardFlowEnabled\":true,\"fullScopeAllowed\":${FULL_SCOPE},\"protocol\":\"openid-connect\",\"defaultClientScopes\":[\"roles\"]}"
+                  EXISTING=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/clients?clientId=${CID}" \
+                    -H "Authorization: Bearer ${ADMIN_TOKEN}" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])")
+                else
+                  echo "Client ${CID} already exists" >&2
+                fi
+                echo "$EXISTING"
+              }
+
+              # Helper: create client role if it doesn't exist
+              create_client_role() {
+                local CLIENT_INTERNAL_ID="$1" ROLE_NAME="$2"
+                local ENCODED_ROLE=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${ROLE_NAME}', safe=''))")
+                local EXISTS=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/clients/${CLIENT_INTERNAL_ID}/roles/${ENCODED_ROLE}" \
+                  -H "Authorization: Bearer ${ADMIN_TOKEN}" -o /dev/null -w '%{http_code}' || true)
+                if [ "$EXISTS" != "200" ]; then
+                  curl -sk -X POST "${SSO_URL}/admin/realms/${REALM}/clients/${CLIENT_INTERNAL_ID}/roles" \
+                    -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"name\":\"${ROLE_NAME}\"}" || true
+                fi
+              }
+
+              # ── Create MCP Gateway client ──
+              GATEWAY_INTERNAL_ID=$(get_or_create_client "${CLIENT_ID}" "false" "${CLIENT_SECRET}" "true" "true")
+              echo "Gateway client internal ID: ${GATEWAY_INTERNAL_ID}"
+
+              # ── Ensure 'roles' client scope exists with client role mapper ──
+              ROLES_SCOPE_EXISTS=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/client-scopes" \
+                -H "Authorization: Bearer ${ADMIN_TOKEN}" | python3 -c "
+              import sys,json
+              scopes = json.load(sys.stdin)
+              for s in scopes:
+                  if s['name'] == 'roles':
+                      print(s['id'])
+                      break
+              ")
+              if [ -z "$ROLES_SCOPE_EXISTS" ]; then
+                echo "Creating 'roles' client scope..."
+                curl -sk -X POST "${SSO_URL}/admin/realms/${REALM}/client-scopes" \
+                  -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d '{
+                    "name":"roles",
+                    "protocol":"openid-connect",
+                    "attributes":{"include.in.token.scope":"false","display.on.consent.screen":"true"},
+                    "protocolMappers":[
+                      {"name":"client roles","protocol":"openid-connect","protocolMapper":"oidc-usermodel-client-role-mapper","consentRequired":false,"config":{"user.attribute":"foo","introspection.token.claim":"true","access.token.claim":"true","claim.name":"resource_access.${client_id}.roles","jsonType.label":"String","multivalued":"true"}},
+                      {"name":"audience resolve","protocol":"openid-connect","protocolMapper":"oidc-audience-resolve-mapper","consentRequired":false,"config":{"introspection.token.claim":"true","access.token.claim":"true"}}
+                    ]
+                  }'
+                echo "roles scope created"
+              else
+                echo "roles scope already exists"
+              fi
+
+              # ── Add 'roles' as default scope on mcp-gateway client ──
+              ROLES_SCOPE_ID=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/client-scopes" \
+                -H "Authorization: Bearer ${ADMIN_TOKEN}" | python3 -c "
+              import sys,json
+              for s in json.load(sys.stdin):
+                  if s['name'] == 'roles':
+                      print(s['id']); break
+              ")
+              if [ -n "$ROLES_SCOPE_ID" ]; then
+                curl -sk -X PUT "${SSO_URL}/admin/realms/${REALM}/clients/${GATEWAY_INTERNAL_ID}/default-client-scopes/${ROLES_SCOPE_ID}" \
+                  -H "Authorization: Bearer ${ADMIN_TOKEN}" 2>/dev/null || true
+                echo "Added roles scope to mcp-gateway client"
+              fi
+
+              # ── Add 'basic' as default scope so tokens include the 'sub' claim ──
+              BASIC_SCOPE_ID=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/client-scopes" \
+                -H "Authorization: Bearer ${ADMIN_TOKEN}" | python3 -c "
+              import sys,json
+              for s in json.load(sys.stdin):
+                  if s['name'] == 'basic':
+                      print(s['id']); break
+              ")
+              if [ -n "$BASIC_SCOPE_ID" ]; then
+                curl -sk -X PUT "${SSO_URL}/admin/realms/${REALM}/clients/${GATEWAY_INTERNAL_ID}/default-client-scopes/${BASIC_SCOPE_ID}" \
+                  -H "Authorization: Bearer ${ADMIN_TOKEN}" 2>/dev/null || true
+                echo "Added basic scope to mcp-gateway client"
+              fi
+
+              # ── Create server clients and tool roles ──
+              {{- range .Values.keycloak.servers }}
+              SERVER_CLIENT_ID="${SERVER_NS}/{{ .name }}"
+              echo "Setting up server client: ${SERVER_CLIENT_ID}"
+              SERVER_INTERNAL_ID=$(get_or_create_client "${SERVER_CLIENT_ID}" "true" "" "false" "false")
+              {{- range .tools }}
+              create_client_role "${SERVER_INTERNAL_ID}" "tool:{{ . }}"
+              {{- end }}
+              echo "  Roles created for {{ .name }}"
+              {{- end }}
+
+              # ── Create groups with client role mappings ──
+              {{- range .Values.keycloak.groups }}
+              GROUP_NAME="{{ .name }}"
+              GROUP_EXISTS=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/groups?search=${GROUP_NAME}&exact=true" \
+                -H "Authorization: Bearer ${ADMIN_TOKEN}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if d else '')")
+              if [ -z "$GROUP_EXISTS" ]; then
+                echo "Creating group ${GROUP_NAME}..."
+                curl -sk -X POST "${SSO_URL}/admin/realms/${REALM}/groups" \
+                  -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"name\":\"${GROUP_NAME}\"}"
+                GROUP_EXISTS=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/groups?search=${GROUP_NAME}&exact=true" \
+                  -H "Authorization: Bearer ${ADMIN_TOKEN}" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])")
+              else
+                echo "Group ${GROUP_NAME} already exists"
+              fi
+
+              # Map client roles to group
+              {{- range .servers }}
+              SERVER_CLIENT_ID_FOR_GROUP="${SERVER_NS}/{{ . }}"
+              SERVER_INT_ID=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/clients?clientId=${SERVER_CLIENT_ID_FOR_GROUP}" \
+                -H "Authorization: Bearer ${ADMIN_TOKEN}" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])")
+              ALL_ROLES=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/clients/${SERVER_INT_ID}/roles" \
+                -H "Authorization: Bearer ${ADMIN_TOKEN}")
+              curl -sk -X POST "${SSO_URL}/admin/realms/${REALM}/groups/${GROUP_EXISTS}/role-mappings/clients/${SERVER_INT_ID}" \
+                -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d "${ALL_ROLES}"
+              echo "  Mapped {{ . }} roles to group ${GROUP_NAME}"
+              {{- end }}
+              {{- end }}
+
+              # ── Create users and assign to groups ──
+              {{- range .Values.keycloak.users }}
+              USER_EXISTS=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/users?username={{ .username }}&exact=true" \
+                -H "Authorization: Bearer ${ADMIN_TOKEN}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if d else '')")
+              if [ -z "$USER_EXISTS" ]; then
+                echo "Creating user {{ .username }}..."
+                curl -sk -X POST "${SSO_URL}/admin/realms/${REALM}/users" \
+                  -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d '{"username":"{{ .username }}","enabled":true,"emailVerified":true,"email":"{{ .email }}","firstName":"{{ .firstName }}","lastName":"{{ .lastName }}","credentials":[{"type":"password","value":"{{ .password }}","temporary":false}]}'
+                USER_EXISTS=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/users?username={{ .username }}&exact=true" \
+                  -H "Authorization: Bearer ${ADMIN_TOKEN}" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])")
+                echo "User {{ .username }} created"
+              else
+                echo "User {{ .username }} already exists"
+              fi
+
+              # Add user to group
+              {{- if .group }}
+              GROUP_ID=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/groups?search={{ .group }}&exact=true" \
+                -H "Authorization: Bearer ${ADMIN_TOKEN}" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])")
+              curl -sk -X PUT "${SSO_URL}/admin/realms/${REALM}/users/${USER_EXISTS}/groups/${GROUP_ID}" \
+                -H "Authorization: Bearer ${ADMIN_TOKEN}"
+              echo "  Added {{ .username }} to group {{ .group }}"
+              {{- end }}
+              {{- end }}
+
+              echo "Keycloak MCP RBAC setup complete"

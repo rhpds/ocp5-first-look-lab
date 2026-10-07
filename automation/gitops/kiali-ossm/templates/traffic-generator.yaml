@@ -1,0 +1,73 @@
+{{- if and .Values.bookinfo.enabled .Values.trafficGenerator.enabled }}
+{{- $ns := .Values.bookinfo.namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traffic-generator-config
+  namespace: {{ $ns }}
+  labels:
+    kiali-test: traffic-generator-config
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+data:
+  duration: "0s"
+  route: "http://productpage.{{ $ns }}.svc.cluster.local:9080/productpage"
+  rate: {{ .Values.trafficGenerator.rate | quote }}
+  silent: "true"
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: kiali-traffic-generator
+  namespace: {{ $ns }}
+  labels:
+    app: kiali-traffic-generator
+    kiali-test: traffic-generator
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kiali-traffic-generator
+      kiali-test: traffic-generator
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: kiali-traffic-generator
+        kiali-test: traffic-generator
+        istio.io/dataplane-mode: "none"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: kiali-traffic-generator
+        image: quay.io/kiali/kiali-test-mesh-traffic-generator:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: DURATION
+          valueFrom:
+            configMapKeyRef:
+              name: traffic-generator-config
+              key: duration
+        - name: ROUTE
+          valueFrom:
+            configMapKeyRef:
+              name: traffic-generator-config
+              key: route
+        - name: RATE
+          valueFrom:
+            configMapKeyRef:
+              name: traffic-generator-config
+              key: rate
+        - name: SILENT
+          valueFrom:
+            configMapKeyRef:
+              name: traffic-generator-config
+              key: silent
+{{- end }}

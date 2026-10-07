@@ -1,0 +1,76 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: limitador-patch
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: limitador-patch
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+rules:
+  - apiGroups: ["limitador.kuadrant.io"]
+    resources: ["limitadors"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: limitador-patch
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+subjects:
+  - kind: ServiceAccount
+    name: limitador-patch
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: limitador-patch
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: limitador-ratelimit-headers
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    metadata:
+      labels:
+        app: limitador-ratelimit-headers
+    spec:
+      serviceAccountName: limitador-patch
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: patch
+          image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              echo "Waiting for Limitador CR..."
+              until oc get limitador limitador -n {{ .Release.Namespace }} &>/dev/null; do
+                sleep 5
+              done
+              oc patch limitador limitador -n {{ .Release.Namespace }} --type merge \
+                -p '{"spec":{"rateLimitHeaders":"DRAFT_VERSION_03"}}'
+              echo "Limitador rate limit headers enabled"

@@ -1,0 +1,21 @@
+---
+
+- name: Find bastion host
+  ansible.builtin.set_fact:
+    r_bastion_host: "{{ groups['bastions'] | first | default(bastion_ansible_host | default('localhost')) }}"
+
+- name: Download and install oc-agentic CLI plugin on bastion
+  ansible.builtin.shell: |
+    curl -sSfL https://github.com/openshift/lightspeed-agentic-operator/releases/latest/download/oc-agentic_linux_amd64.tar.gz | tar xz -C /usr/local/bin oc-agentic
+    chmod 755 /usr/local/bin/oc-agentic
+  delegate_to: "{{ r_bastion_host }}"
+  become: true
+  register: r_oc_agentic_install
+  retries: 3
+  delay: 10
+  until: r_oc_agentic_install is not failed
+
+- name: Verify oc-agentic is installed
+  ansible.builtin.command: /usr/local/bin/oc-agentic --help
+  delegate_to: "{{ r_bastion_host }}"
+  changed_when: false

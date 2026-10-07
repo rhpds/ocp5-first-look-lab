@@ -1,0 +1,41 @@
+subscription:
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+
+operators:
+  namespace: openshift-operators
+
+tempo:
+  operatorNamespace: openshift-tempo-operator
+  namespace: tempo
+  subscription:
+    source: redhat-operators-v422
+
+istio:
+  namespace: istio-system
+  cniNamespace: istio-cni
+  revision: default-v1-30-4
+
+s4:
+  accessKeyId: s4admin
+  accessKeySecret: s4secret
+  endpoint: "http://s4:7480"
+  tempoSecretName: tempostack-dev-s4
+  bucketName: default
+
+addons:
+  prometheus: true
+
+kiali:
+  version: default
+
+bookinfo:
+  enabled: true
+  namespace: bookinfo
+
+trafficGenerator:
+  enabled: true
+  rate: "1"
+
+eapPreconditions:
+  enabled: true

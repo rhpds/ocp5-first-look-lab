@@ -1,0 +1,486 @@
+image: quay.io/jfalkner1/mock-mcp-server:latest
+
+gateway:
+  name: mcp-gateway
+  namespace: openshift-ingress
+
+auth:
+  realm: keycloak
+  clusterSubdomain: ""
+
+servers:
+  - name: inventory
+    hint: "Warehouse inventory management - products, stock levels, alerts"
+    categories:
+      - operations
+    config: |
+      name: inventory
+      description: Warehouse inventory management system
+      tools:
+        - name: list_products
+          description: List all products in the warehouse inventory, optionally filtered by category
+          parameters:
+            category:
+              type: string
+              description: "Product category to filter by (electronics, furniture, clothing, food)"
+              required: false
+          response:
+            - id: "PRD-001"
+              name: "Wireless Keyboard"
+              category: "electronics"
+              quantity: 342
+              location: "Aisle 4, Shelf B"
+              reorder_threshold: 50
+              status: "in_stock"
+            - id: "PRD-002"
+              name: "Standing Desk"
+              category: "furniture"
+              quantity: 12
+              location: "Warehouse 2, Bay 7"
+              reorder_threshold: 10
+              status: "low_stock"
+            - id: "PRD-003"
+              name: "USB-C Hub"
+              category: "electronics"
+              quantity: 0
+              location: "Aisle 4, Shelf C"
+              reorder_threshold: 25
+              status: "out_of_stock"
+            - id: "PRD-004"
+              name: "Ergonomic Chair"
+              category: "furniture"
+              quantity: 87
+              location: "Warehouse 2, Bay 3"
+              reorder_threshold: 15
+              status: "in_stock"
+            - id: "PRD-005"
+              name: "Monitor Arm"
+              category: "electronics"
+              quantity: 8
+              location: "Aisle 5, Shelf A"
+              reorder_threshold: 20
+              status: "low_stock"
+        - name: get_product
+          description: Get detailed information about a specific product by its ID
+          parameters:
+            product_id:
+              type: string
+              description: "Product ID (e.g. PRD-001)"
+              required: true
+          response:
+            id: "PRD-001"
+            name: "Wireless Keyboard"
+            category: "electronics"
+            quantity: 342
+            location: "Aisle 4, Shelf B"
+            unit_cost: 24.99
+            supplier: "TechParts Inc."
+            last_restocked: "2026-07-15"
+            reorder_threshold: 50
+            status: "in_stock"
+        - name: check_stock_alerts
+          description: Check for products that are low on stock or out of stock
+          parameters: {}
+          response:
+            alerts:
+              - product_id: "PRD-002"
+                name: "Standing Desk"
+                quantity: 12
+                threshold: 10
+                severity: "warning"
+                message: "Approaching reorder threshold"
+              - product_id: "PRD-003"
+                name: "USB-C Hub"
+                quantity: 0
+                threshold: 25
+                severity: "critical"
+                message: "Out of stock - immediate reorder required"
+              - product_id: "PRD-005"
+                name: "Monitor Arm"
+                quantity: 8
+                threshold: 20
+                severity: "warning"
+                message: "Below reorder threshold"
+            summary:
+              total_alerts: 3
+              critical: 1
+              warning: 2
+        - name: update_quantity
+          description: Update the stock quantity for a product (e.g. after receiving a shipment)
+          parameters:
+            product_id:
+              type: string
+              description: "Product ID to update"
+              required: true
+            quantity_change:
+              type: integer
+              description: "Quantity to add (positive) or remove (negative)"
+              required: true
+            reason:
+              type: string
+              description: "Reason for the change (shipment_received, sold, damaged, audit_correction)"
+              required: true
+          response:
+            success: true
+            product_id: "PRD-001"
+            previous_quantity: 342
+            new_quantity: 392
+            change: 50
+            reason: "shipment_received"
+            timestamp: "2026-07-23T14:30:00Z"
+        - name: search_products
+          description: Search for products by name or keyword
+          parameters:
+            query:
+              type: string
+              description: "Search query to match against product names"
+              required: true
+          response:
+            results:
+              - id: "PRD-001"
+                name: "Wireless Keyboard"
+                category: "electronics"
+                quantity: 342
+                relevance: 0.95
+              - id: "PRD-005"
+                name: "Monitor Arm"
+                category: "electronics"
+                quantity: 8
+                relevance: 0.42
+            total: 2
+
+  - name: payments
+    hint: "Payment processing - transactions, refunds, daily summaries"
+    categories:
+      - finance
+    config: |
+      name: payments
+      description: Payment processing and transaction management system
+      tools:
+        - name: list_transactions
+          description: List recent payment transactions, optionally filtered by status
+          parameters:
+            status:
+              type: string
+              description: "Filter by status (completed, pending, failed, refunded)"
+              required: false
+            limit:
+              type: integer
+              description: "Number of transactions to return (default 10)"
+              required: false
+          response:
+            - id: "TXN-90271"
+              amount: 1249.99
+              currency: "USD"
+              status: "completed"
+              method: "credit_card"
+              customer_id: "CUST-4401"
+              description: "Standing desk + monitor arm bundle"
+              created_at: "2026-07-23T09:14:22Z"
+            - id: "TXN-90272"
+              amount: 89.97
+              currency: "USD"
+              status: "completed"
+              method: "invoice"
+              customer_id: "CUST-3318"
+              description: "3x Wireless Keyboards"
+              created_at: "2026-07-23T09:31:05Z"
+            - id: "TXN-90273"
+              amount: 4500.00
+              currency: "USD"
+              status: "pending"
+              method: "wire_transfer"
+              customer_id: "CUST-2205"
+              description: "Bulk office furniture order"
+              created_at: "2026-07-23T10:02:48Z"
+            - id: "TXN-90274"
+              amount: 24.99
+              currency: "USD"
+              status: "failed"
+              method: "credit_card"
+              customer_id: "CUST-5587"
+              description: "Wireless Keyboard"
+              error: "Card declined - insufficient funds"
+              created_at: "2026-07-23T10:15:33Z"
+            - id: "TXN-90275"
+              amount: 349.98
+              currency: "USD"
+              status: "refunded"
+              method: "credit_card"
+              customer_id: "CUST-4401"
+              description: "2x Ergonomic Chairs (returned)"
+              refund_reason: "Defective armrest mechanism"
+              created_at: "2026-07-22T16:40:11Z"
+        - name: get_transaction
+          description: Get full details of a specific transaction by its ID
+          parameters:
+            transaction_id:
+              type: string
+              description: "Transaction ID (e.g. TXN-90271)"
+              required: true
+          response:
+            id: "TXN-90271"
+            amount: 1249.99
+            currency: "USD"
+            status: "completed"
+            method: "credit_card"
+            card_last_four: "4242"
+            customer_id: "CUST-4401"
+            customer_name: "Acme Corp"
+            description: "Standing desk + monitor arm bundle"
+            line_items:
+              - product_id: "PRD-002"
+                name: "Standing Desk"
+                quantity: 1
+                unit_price: 899.99
+              - product_id: "PRD-005"
+                name: "Monitor Arm"
+                quantity: 1
+                unit_price: 350.00
+            subtotal: 1249.99
+            tax: 0.00
+            total: 1249.99
+            created_at: "2026-07-23T09:14:22Z"
+            settled_at: "2026-07-23T09:14:25Z"
+        - name: process_refund
+          description: Initiate a refund for a completed transaction
+          parameters:
+            transaction_id:
+              type: string
+              description: "Transaction ID to refund"
+              required: true
+            amount:
+              type: number
+              description: "Amount to refund (partial refund if less than original)"
+              required: true
+            reason:
+              type: string
+              description: "Reason for refund (defective, wrong_item, customer_request, duplicate_charge)"
+              required: true
+          response:
+            success: true
+            refund_id: "RFD-10044"
+            transaction_id: "TXN-90271"
+            refund_amount: 350.00
+            original_amount: 1249.99
+            status: "processing"
+            estimated_completion: "2026-07-25T09:14:22Z"
+            reason: "defective"
+        - name: get_daily_summary
+          description: Get a summary of payment activity for today
+          parameters: {}
+          response:
+            date: "2026-07-23"
+            total_transactions: 47
+            total_revenue: 18432.56
+            by_status:
+              completed: 38
+              pending: 5
+              failed: 3
+              refunded: 1
+            by_method:
+              credit_card: 29
+              invoice: 11
+              wire_transfer: 5
+              paypal: 2
+            average_transaction: 392.18
+            largest_transaction:
+              id: "TXN-90273"
+              amount: 4500.00
+            failed_transactions:
+              count: 3
+              total_lost: 574.97
+              top_reason: "Card declined"
+        - name: check_payment_status
+          description: Check the current processing status of a pending payment
+          parameters:
+            transaction_id:
+              type: string
+              description: "Transaction ID to check"
+              required: true
+          response:
+            transaction_id: "TXN-90273"
+            status: "pending"
+            method: "wire_transfer"
+            amount: 4500.00
+            steps:
+              - step: "initiated"
+                status: "completed"
+                timestamp: "2026-07-23T10:02:48Z"
+              - step: "bank_verification"
+                status: "completed"
+                timestamp: "2026-07-23T10:03:12Z"
+              - step: "funds_transfer"
+                status: "in_progress"
+                timestamp: "2026-07-23T10:03:15Z"
+              - step: "settlement"
+                status: "waiting"
+                timestamp: null
+            estimated_completion: "2026-07-23T14:00:00Z"
+
+  - name: accounts
+    hint: "Customer account management - profiles, credit, order history"
+    categories:
+      - finance
+    config: |
+      name: accounts
+      description: Customer account management system
+      tools:
+        - name: list_accounts
+          description: List customer accounts, optionally filtered by status or tier
+          parameters:
+            status:
+              type: string
+              description: "Filter by status (active, suspended, closed)"
+              required: false
+            tier:
+              type: string
+              description: "Filter by tier (enterprise, business, starter)"
+              required: false
+          response:
+            - id: "CUST-2205"
+              name: "GlobalTech Industries"
+              tier: "enterprise"
+              status: "active"
+              contact_email: "procurement@globaltech.example.com"
+              credit_limit: 50000.00
+              balance_due: 4500.00
+              created_at: "2024-03-15"
+            - id: "CUST-3318"
+              name: "Bright Office Supplies"
+              tier: "business"
+              status: "active"
+              contact_email: "orders@brightoffice.example.com"
+              credit_limit: 10000.00
+              balance_due: 89.97
+              created_at: "2025-01-22"
+            - id: "CUST-4401"
+              name: "Acme Corp"
+              tier: "enterprise"
+              status: "active"
+              contact_email: "ap@acme.example.com"
+              credit_limit: 75000.00
+              balance_due: 1249.99
+              created_at: "2023-11-08"
+            - id: "CUST-5587"
+              name: "StartupHub Inc"
+              tier: "starter"
+              status: "active"
+              contact_email: "admin@startuphub.example.com"
+              credit_limit: 2500.00
+              balance_due: 0.00
+              created_at: "2026-06-01"
+            - id: "CUST-6102"
+              name: "OldCo Manufacturing"
+              tier: "business"
+              status: "suspended"
+              contact_email: "finance@oldco.example.com"
+              credit_limit: 15000.00
+              balance_due: 12340.00
+              suspension_reason: "Payment overdue 90+ days"
+              created_at: "2024-08-30"
+        - name: get_account
+          description: Get detailed information about a specific customer account
+          parameters:
+            account_id:
+              type: string
+              description: "Customer account ID (e.g. CUST-4401)"
+              required: true
+          response:
+            id: "CUST-4401"
+            name: "Acme Corp"
+            tier: "enterprise"
+            status: "active"
+            contact_email: "ap@acme.example.com"
+            billing_address: "100 Innovation Way, Suite 400, Austin, TX 78701"
+            credit_limit: 75000.00
+            balance_due: 1249.99
+            payment_terms: "Net 30"
+            last_payment:
+              amount: 6200.00
+              date: "2026-07-10"
+              method: "wire_transfer"
+            ytd_spend: 48230.44
+            account_manager: "Sarah Chen"
+            created_at: "2023-11-08"
+            notes: "Preferred customer. Auto-approve orders under $5000."
+        - name: get_account_history
+          description: Get recent order and payment history for a customer account
+          parameters:
+            account_id:
+              type: string
+              description: "Customer account ID"
+              required: true
+          response:
+            account_id: "CUST-4401"
+            account_name: "Acme Corp"
+            recent_orders:
+              - id: "TXN-90271"
+                date: "2026-07-23"
+                amount: 1249.99
+                status: "completed"
+                description: "Standing desk + monitor arm bundle"
+              - id: "TXN-90275"
+                date: "2026-07-22"
+                amount: 349.98
+                status: "refunded"
+                description: "2x Ergonomic Chairs (returned)"
+              - id: "TXN-90198"
+                date: "2026-07-10"
+                amount: 6200.00
+                status: "completed"
+                description: "Q3 office equipment refresh"
+            recent_payments:
+              - date: "2026-07-10"
+                amount: 6200.00
+                method: "wire_transfer"
+                invoice: "INV-8834"
+              - date: "2026-06-15"
+                amount: 3450.00
+                method: "wire_transfer"
+                invoice: "INV-8791"
+            thirty_day_spend: 7799.97
+            sixty_day_spend: 11249.97
+        - name: update_credit_limit
+          description: Update the credit limit for a customer account
+          parameters:
+            account_id:
+              type: string
+              description: "Customer account ID"
+              required: true
+            new_limit:
+              type: number
+              description: "New credit limit amount"
+              required: true
+            reason:
+              type: string
+              description: "Reason for the change (credit_review, customer_request, risk_adjustment)"
+              required: true
+          response:
+            success: true
+            account_id: "CUST-4401"
+            previous_limit: 75000.00
+            new_limit: 100000.00
+            reason: "credit_review"
+            approved_by: "system"
+            effective_date: "2026-07-23"
+        - name: check_credit_available
+          description: Check available credit for a customer before approving an order
+          parameters:
+            account_id:
+              type: string
+              description: "Customer account ID"
+              required: true
+            order_amount:
+              type: number
+              description: "Proposed order amount to check against available credit"
+              required: true
+          response:
+            account_id: "CUST-4401"
+            account_name: "Acme Corp"
+            credit_limit: 75000.00
+            balance_due: 1249.99
+            available_credit: 73750.01
+            requested_amount: 5000.00
+            approved: true
+            remaining_after_order: 68750.01

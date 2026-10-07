@@ -1,0 +1,29 @@
+{{- if .Values.kialiOssm.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "app-of-apps.metadata" (dict "name" .Values.kialiOssm.name "namespace" .Values.argocd.namespace "syncWave" "0") }}
+spec:
+  destination:
+    namespace: {{ .Values.kialiOssm.namespace }}
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: {{ .Values.gitops.basePath }}kiali-ossm
+    repoURL: {{ .Values.gitops.repoURL }}
+    targetRevision: {{ .Values.gitops.targetRevision }}
+    helm:
+      valuesObject:
+        subscription:
+          source: redhat-operators
+        tempo:
+          subscription:
+            source: {{ .Values.catalogSource.name }}
+  ignoreDifferences:
+  - group: networking.istio.io
+    kind: VirtualService
+    name: reviews
+    namespace: bookinfo
+    jsonPointers:
+    - /spec/http/0/route
+{{ include "app-of-apps.syncPolicy" . | indent 2 }}
+{{- end }}

@@ -1,0 +1,33 @@
+{{- if .Values.acsMcpServer.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "app-of-apps.metadata" (dict "name" .Values.acsMcpServer.name "namespace" .Values.argocd.namespace "syncWave" "1") }}
+spec:
+  destination:
+    namespace: {{ .Values.acsMcpServer.namespace }}
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    repoURL: https://github.com/stackrox/stackrox-mcp.git
+    targetRevision: main
+    path: charts/stackrox-mcp
+    helm:
+      apiVersions:
+        - route.openshift.io/v1
+      valuesObject:
+        config:
+          central:
+            url: "central.{{ .Values.acs.namespace }}:443"
+        centralCACert:
+          existingSecretName: central-ca-cert
+        image:
+          tag: "05222ea"
+        tlsSecret:
+          existingSecretName: acs-mcp-server-tls
+        replicaCount: 1
+        service:
+          type: ClusterIP
+          annotations:
+            service.beta.openshift.io/serving-cert-secret-name: acs-mcp-server-tls
+{{ include "app-of-apps.syncPolicy" . | indent 2 }}
+{{- end }}

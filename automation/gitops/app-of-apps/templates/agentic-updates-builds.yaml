@@ -1,0 +1,25 @@
+{{- if and .Values.agenticUpdatesBuilds .Values.agenticUpdatesBuilds.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "app-of-apps.metadata" (dict "name" .Values.agenticUpdatesBuilds.name "namespace" .Values.argocd.namespace "syncWave" "2") }}
+spec:
+  destination:
+    namespace: {{ .Values.agenticUpdatesBuilds.namespace }}
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: {{ .Values.gitops.basePath }}agentic-updates-builds
+    repoURL: {{ .Values.gitops.repoURL }}
+    targetRevision: {{ .Values.gitops.targetRevision }}
+  ignoreDifferences:
+    - group: build.openshift.io
+      kind: BuildConfig
+      jsonPointers:
+        - /spec/failedBuildsHistoryLimit
+        - /spec/successfulBuildsHistoryLimit
+        - /spec/runPolicy
+        - /spec/nodeSelector
+        - /spec/postCommit
+        - /spec/resources
+{{ include "app-of-apps.syncPolicy" . | indent 2 }}
+{{- end }}

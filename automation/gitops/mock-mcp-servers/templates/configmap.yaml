@@ -1,0 +1,11 @@
+{{- range .Values.servers }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .name }}-mcp-config
+  namespace: {{ $.Release.Namespace }}
+data:
+  tools.yaml: |
+{{ .config | indent 4 }}
+{{- end }}

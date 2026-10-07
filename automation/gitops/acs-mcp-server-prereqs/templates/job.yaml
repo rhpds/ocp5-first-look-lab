@@ -1,0 +1,42 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: copy-central-ca
+  namespace: {{ .Values.targetNamespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    spec:
+      serviceAccountName: copy-central-ca
+      restartPolicy: OnFailure
+      containers:
+        - name: copy-ca
+          image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              SOURCE_NS="{{ .Values.acsNamespace }}"
+              TARGET_NS="{{ .Values.targetNamespace }}"
+              SOURCE_SECRET="{{ .Values.sourceSecret }}"
+              TARGET_SECRET="{{ .Values.targetSecret }}"
+              SOURCE_KEY="{{ .Values.sourceKey }}"
+
+              echo "Copying CA cert from ${SOURCE_NS}/${SOURCE_SECRET} to ${TARGET_NS}/${TARGET_SECRET}..."
+
+              oc extract secret/"${SOURCE_SECRET}" -n "${SOURCE_NS}" --keys="${SOURCE_KEY}" --to=/tmp --confirm
+              CA_CERT=$(cat /tmp/${SOURCE_KEY})
+
+              if [ -z "$CA_CERT" ]; then
+                echo "ERROR: Could not read ${SOURCE_KEY} from ${SOURCE_SECRET} in ${SOURCE_NS}"
+                exit 1
+              fi
+
+              oc create secret generic "${TARGET_SECRET}" \
+                -n "${TARGET_NS}" \
+                --from-literal=ca.crt="$CA_CERT" \
+                --dry-run=client -o yaml | oc apply -f -
+
+              echo "CA cert copied successfully"

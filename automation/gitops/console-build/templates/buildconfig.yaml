@@ -1,0 +1,17 @@
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: console
+  namespace: {{ .Values.namespace }}
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: console:latest
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+  resources:
+    {{- toYaml .Values.build.resources | nindent 4 }}

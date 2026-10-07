@@ -1,0 +1,22 @@
+{{- range .Values.servers }}
+---
+apiVersion: mcp.kuadrant.io/v1alpha1
+kind: MCPServerRegistration
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  prefix: "{{ .name }}_"
+  hint: {{ .hint | quote }}
+  category:
+    {{- range .categories }}
+    - {{ . }}
+    {{- end }}
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ .name }}-mcp-route
+{{- end }}

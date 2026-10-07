@@ -1,0 +1,38 @@
+{{- if .Values.agentic.enabled }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: agentic.openshift.io-agenticrun-suspension
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  paramKind:
+    apiVersion: agentic.openshift.io/v1alpha1
+    kind: AgenticOLSConfig
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["agentic.openshift.io"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE"]
+        resources: ["agenticruns"]
+  validations:
+    - expression: "!has(params.spec.suspended) || !params.spec.suspended"
+      messageExpression: "'AgenticRun creation is blocked: agentic system is suspended (AgenticOLSConfig.spec.suspended=true)'"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: agentic.openshift.io-agenticrun-suspension
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  policyName: agentic.openshift.io-agenticrun-suspension
+  validationActions: [Deny]
+  paramRef:
+    name: cluster
+    parameterNotFoundAction: Allow
+{{- end }}

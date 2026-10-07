@@ -1,0 +1,29 @@
+{{- if .Values.openshiftMcpServer.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "app-of-apps.metadata" (dict "name" .Values.openshiftMcpServer.name "namespace" .Values.argocd.namespace "syncWave" "2") }}
+spec:
+  ignoreDifferences:
+    - group: ""
+      kind: ConfigMap
+      name: mcp-config
+      jsonPointers:
+        - /data
+    - group: apps
+      kind: Deployment
+      name: openshift-mcp-server
+      jsonPointers:
+        - /spec/template/spec/containers/0/args
+  destination:
+    namespace: {{ .Values.openshiftMcpServer.namespace }}
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: {{ .Values.gitops.basePath }}openshift-mcp-server
+    repoURL: {{ .Values.gitops.repoURL }}
+    targetRevision: {{ .Values.gitops.targetRevision }}
+    helm:
+      valuesObject:
+        clusterSubdomain: {{ .Values.cluster.subdomain }}
+{{ include "app-of-apps.syncPolicy" . | indent 2 }}
+{{- end }}

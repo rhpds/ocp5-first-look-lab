@@ -1,0 +1,21 @@
+{{- if .Values.mcpGateway.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "app-of-apps.metadata" (dict "name" .Values.mcpGateway.name "namespace" .Values.argocd.namespace "syncWave" "0") }}
+spec:
+  destination:
+    namespace: {{ .Values.mcpGateway.namespace }}
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: {{ .Values.gitops.basePath }}mcp-gateway
+    repoURL: {{ .Values.gitops.repoURL }}
+    targetRevision: {{ .Values.gitops.targetRevision }}
+    helm:
+      valuesObject:
+        subscription:
+          source: {{ include "app-of-apps.operatorSource" . }}
+        gateway:
+          clusterSubdomain: {{ .Values.cluster.subdomain }}
+{{ include "app-of-apps.syncPolicy" . | indent 2 }}
+{{- end }}

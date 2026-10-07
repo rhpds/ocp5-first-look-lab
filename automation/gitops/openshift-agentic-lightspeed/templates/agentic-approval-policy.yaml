@@ -1,0 +1,20 @@
+{{- if .Values.agentic.enabled }}
+---
+apiVersion: agentic.openshift.io/v1alpha1
+kind: ApprovalPolicy
+metadata:
+  name: cluster
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  maxConcurrentRuns: 5
+  stages:
+    - name: Analysis
+      approval: Manual
+    - name: Execution
+      approval: Manual
+    - name: Verification
+      approval: Automatic
+{{- end }}

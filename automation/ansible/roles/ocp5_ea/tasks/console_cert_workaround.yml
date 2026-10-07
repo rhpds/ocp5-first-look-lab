@@ -1,0 +1,57 @@
+---
+# OCP 5.0 console self-signed cert workaround
+#
+# The console-operator auto-generates a throwaway TLS cert on the console
+# route for HTTP/2 support, overriding the router's defaultCertificate.
+# This patches componentRoutes to tell the console-operator to use the
+# ingress cert instead.
+
+- name: Check if ingress cert secret exists
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: "{{ ocp5_ea_console_cert_source_secret }}"
+    namespace: "{{ ocp5_ea_console_cert_source_namespace }}"
+  register: r_ingress_cert
+  retries: 10
+  delay: 10
+  until:
+    - r_ingress_cert.resources is defined
+    - r_ingress_cert.resources | length == 1
+
+- name: Copy ingress cert secret to openshift-config namespace
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ ocp5_ea_console_cert_target_secret }}"
+        namespace: openshift-config
+      type: kubernetes.io/tls
+      data:
+        tls.crt: "{{ r_ingress_cert.resources[0].data['tls.crt'] }}"
+        tls.key: "{{ r_ingress_cert.resources[0].data['tls.key'] }}"
+
+- name: Get console route hostname
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    name: console
+    namespace: openshift-console
+  register: r_console_route_cert
+
+- name: Patch ingress config with componentRoutes for console
+  kubernetes.core.k8s:
+    api_version: config.openshift.io/v1
+    kind: Ingress
+    name: cluster
+    state: present
+    definition:
+      spec:
+        componentRoutes:
+          - name: console
+            namespace: openshift-console
+            hostname: "{{ r_console_route_cert.resources[0].spec.host }}"
+            servingCertKeyPairSecret:
+              name: "{{ ocp5_ea_console_cert_target_secret }}"

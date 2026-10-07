@@ -1,0 +1,43 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: enable-vsock
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    spec:
+      serviceAccountName: enable-vsock
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: enable-vsock
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              echo "Checking VSOCK feature gate..."
+              CURRENT=$(oc get kubevirt kubevirt-kubevirt-hyperconverged -n openshift-cnv -o json | \
+                python3 -c "import sys,json; gates=json.load(sys.stdin).get('spec',{}).get('configuration',{}).get('developerConfiguration',{}).get('featureGates',[]); print('VSOCK' in gates)")
+
+              if [ "$CURRENT" = "True" ]; then
+                echo "VSOCK feature gate already enabled"
+                exit 0
+              fi
+
+              echo "Enabling VSOCK via HyperConverged annotation..."
+              oc annotate hyperconverged kubevirt-hyperconverged -n openshift-cnv \
+                'kubevirt.kubevirt.io/jsonpatch=[{"op":"add","path":"/spec/configuration/developerConfiguration/featureGates/-","value":"VSOCK"}]' \
+                --overwrite
+
+              echo "VSOCK feature gate enabled"

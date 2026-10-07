@@ -1,0 +1,105 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: console-build-orchestrator
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  activeDeadlineSeconds: 1800
+  template:
+    metadata:
+      labels:
+        app: console-build-orchestrator
+    spec:
+      serviceAccountName: console-builder
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: orchestrator
+          image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              NS="{{ .Values.namespace }}"
+              GIT_URI="{{ .Values.git.uri }}"
+              GIT_REF="{{ .Values.git.ref }}"
+
+              wait_for_build() {
+                local name="$1"
+                local timeout="${2:-1500}"
+                echo "Waiting for build ${name} (timeout ${timeout}s)..."
+                local elapsed=0
+                while [ $elapsed -lt $timeout ]; do
+                  local phase=$(oc get build "${name}" -n "$NS" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+                  case "$phase" in
+                    Complete) echo "Build ${name} completed"; return 0 ;;
+                    Failed|Error|Cancelled) echo "Build ${name} failed: ${phase}"; return 1 ;;
+                    *) sleep 10; elapsed=$((elapsed + 10)) ;;
+                  esac
+                done
+                echo "Build ${name} timed out after ${timeout}s"
+                return 1
+              }
+
+              # ── Step 1: Generate Dockerfile ──
+              echo "=== Generating Dockerfile ==="
+              BUILDDIR=$(mktemp -d)
+              cat > "${BUILDDIR}/Dockerfile" <<DOCKERFILE
+              FROM registry.access.redhat.com/ubi9/go-toolset:latest AS gobuilder
+              USER root
+              RUN mkdir -p /go/src/github.com/openshift/console/
+              RUN git clone --depth 1 ${GIT_URI} -b ${GIT_REF} /go/src/github.com/openshift/console/
+              WORKDIR /go/src/github.com/openshift/console/
+              RUN ./build-backend.sh
+
+              FROM registry.access.redhat.com/ubi9/nodejs-22:latest AS nodebuilder
+              USER 0
+              ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 CYPRESS_INSTALL_BINARY=0
+              RUN git clone --depth 1 ${GIT_URI} -b ${GIT_REF} /tmp/console
+              WORKDIR /tmp/console
+              RUN ./build-frontend.sh
+
+              FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+              RUN mkdir -p /opt/bridge/bin
+              COPY --from=gobuilder /go/src/github.com/openshift/console/bin/bridge /opt/bridge/bin
+              COPY --from=nodebuilder /tmp/console/frontend/public/dist /opt/bridge/static
+              WORKDIR /
+              USER 1001
+              CMD [ "/opt/bridge/bin/bridge", "--public-dir=/opt/bridge/static" ]
+              DOCKERFILE
+              sed -i 's/^              //' "${BUILDDIR}/Dockerfile"
+
+              echo "=== Dockerfile ==="
+              cat "${BUILDDIR}/Dockerfile"
+
+              # ── Step 2: Build ──
+              echo "=== Starting build ==="
+              oc start-build console -n "$NS" --from-dir="${BUILDDIR}"
+              sleep 5
+              BUILD_NAME=$(oc get builds -n "$NS" -l buildconfig=console --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}')
+              wait_for_build "$BUILD_NAME" 1500
+
+              # ── Step 3: Deploy ──
+              echo "=== Setting console operator to Unmanaged ==="
+              oc patch consoles.operator.openshift.io cluster --type merge \
+                -p '{"spec":{"managementState":"Unmanaged"}}'
+
+              CONSOLE_IMAGE=$(oc get imagestream console -n "$NS" -o jsonpath='{.status.tags[?(@.tag=="latest")].items[0].dockerImageReference}')
+              echo "Console image: ${CONSOLE_IMAGE}"
+
+              echo "=== Patching console deployment ==="
+              oc set image deploy console console="${CONSOLE_IMAGE}" -n openshift-console
+              oc rollout status deploy/console -n openshift-console --timeout=180s
+
+              echo "=== Console build and deploy complete ==="

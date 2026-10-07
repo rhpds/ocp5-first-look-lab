@@ -1,0 +1,24 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: user-imports-alerts
+  namespace: user-imports
+spec:
+  groups:
+    - name: user-imports.scheduling
+      rules:
+        - alert: UserImportPodNotScheduled
+          expr: |
+            kube_pod_status_unschedulable{namespace="user-imports"} == 1
+            or
+            (
+              kube_pod_status_phase{namespace="user-imports", phase="Pending"} == 1
+              unless
+              kube_pod_status_phase{namespace="user-imports", phase="Running"} == 1
+            )
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod {{`{{ $labels.pod }}`}} cannot be scheduled"
+            description: "Pod {{`{{ $labels.namespace }}`}}/{{`{{ $labels.pod }}`}} has been in an unschedulable state for more than 1 minute. The pod may be waiting for node resources or has unsatisfiable node affinity/selector constraints."

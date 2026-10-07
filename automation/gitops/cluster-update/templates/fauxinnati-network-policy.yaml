@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fauxinnati-allow-egress-to-api-server
+  namespace: openshift-cluster-version
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  egress:
+  - ports:
+    - port: 6443
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      app: fauxinnati
+  policyTypes:
+  - Egress

@@ -1,0 +1,72 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: payments-api
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: payments-api
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgres
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: reporting-service
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: reporting-service
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: payment-alerts
+  namespace: payments
+spec:
+  groups:
+    - name: payments.business
+      rules:
+        - alert: PaymentErrorRateHigh
+          expr: |
+            sum(rate(http_requests_total{namespace="payments", code=~"5.."}[1m]))
+            / sum(rate(http_requests_total{namespace="payments"}[1m])) * 100 > 15
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: Payment error rate critical
+            description: "Payment error rate is {{`{{ $value | printf \"%.2f\" }}`}}%, which exceeds the 15% threshold."
+    - name: payments.database
+      rules:
+        - alert: PostgresqlTooManyConnections
+          expr: |
+            sum(pg_stat_activity_count) > 13
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: Too many database connections
+            description: "{{`{{ $value }}`}} active connections detected. This may indicate connection leaks."

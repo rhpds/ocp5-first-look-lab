@@ -1,0 +1,25 @@
+---
+apiVersion: tempo.grafana.com/v1alpha1
+kind: TempoStack
+metadata:
+  name: tempo
+  namespace: {{ .Values.tempo.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  storageSize: 1Gi
+  storage:
+    secret:
+      type: s3
+      name: {{ .Values.s4.tempoSecretName }}
+  template:
+    distributor:
+      tls:
+        enabled: false
+    queryFrontend:
+      jaegerQuery:
+        enabled: true
+        ingress:
+          route:
+            termination: edge
+          type: route

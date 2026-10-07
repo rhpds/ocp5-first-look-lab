@@ -1,0 +1,14 @@
+namespace: console-build
+
+git:
+  uri: https://github.com/openshift/console.git
+  ref: main
+
+build:
+  resources:
+    limits:
+      cpu: "4"
+      memory: 12Gi
+    requests:
+      cpu: "2"
+      memory: 8Gi

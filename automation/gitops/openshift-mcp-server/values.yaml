@@ -1,0 +1,25 @@
+namespace: openshift-mcp
+clusterSubdomain: ""
+name: openshift-mcp-server
+image: registry.redhat.io/openshift-mcp-tech-preview/openshift-mcp-server-rhel9:0.3
+
+toolsets:
+  - core
+  - config
+  - metrics
+  - netedge
+  - openshift
+  - ossm
+
+users:
+  - username: mcp-admin
+    email: mcp-admin@example.com
+    firstName: MCP
+    lastName: Admin
+    clusterRole: cluster-admin
+  - username: mcp-viewer
+    email: mcp-viewer@example.com
+    firstName: MCP
+    lastName: Viewer
+    clusterRole: view
+

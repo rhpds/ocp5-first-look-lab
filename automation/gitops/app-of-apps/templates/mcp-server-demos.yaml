@@ -1,0 +1,20 @@
+{{- if .Values.acsMcpServer.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "app-of-apps.metadata" (dict "name" "mcp-server-demos" "namespace" .Values.argocd.namespace "syncWave" "1") }}
+spec:
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+  destination:
+    namespace: openshift-gitops
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: {{ .Values.gitops.basePath }}mcp-server-demos
+    repoURL: {{ .Values.gitops.repoURL }}
+    targetRevision: {{ .Values.gitops.targetRevision }}
+{{ include "app-of-apps.syncPolicy" . | indent 2 }}
+{{- end }}

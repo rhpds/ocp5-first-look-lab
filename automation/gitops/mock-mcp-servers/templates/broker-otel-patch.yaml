@@ -1,0 +1,71 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: broker-otel-patch
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: broker-otel-patch
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: broker-otel-patch
+  namespace: {{ .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: broker-otel-patch
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: broker-otel-patch
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: broker-otel-patch
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  template:
+    metadata:
+      labels:
+        app: broker-otel-patch
+    spec:
+      serviceAccountName: broker-otel-patch
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: patch
+          image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              echo "Waiting for mcp-gateway deployment..."
+              until oc get deployment mcp-gateway -n {{ .Release.Namespace }} &>/dev/null; do
+                sleep 5
+              done
+              oc set env deployment/mcp-gateway -n {{ .Release.Namespace }} \
+                OTEL_EXPORTER_OTLP_ENDPOINT="http://jaeger.{{ .Release.Namespace }}.svc:4318" \
+                OTEL_EXPORTER_OTLP_INSECURE="true"
+              echo "OTEL tracing enabled on broker"

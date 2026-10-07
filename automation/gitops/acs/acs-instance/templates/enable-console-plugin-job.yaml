@@ -1,0 +1,67 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: enable-acs-console-plugin
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: enable-acs-console-plugin
+rules:
+  - apiGroups: ["operator.openshift.io"]
+    resources: ["consoles"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: enable-acs-console-plugin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: enable-acs-console-plugin
+subjects:
+  - kind: ServiceAccount
+    name: enable-acs-console-plugin
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: enable-acs-console-plugin
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    spec:
+      serviceAccountName: enable-acs-console-plugin
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: enable-plugin
+          image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              PLUGIN="advanced-cluster-security"
+              CURRENT=$(oc get console.operator.openshift.io cluster -o jsonpath='{.spec.plugins}')
+              if echo "$CURRENT" | grep -q "$PLUGIN"; then
+                echo "ACS console plugin already enabled"
+              else
+                oc patch console.operator.openshift.io cluster --type json \
+                  -p "[{\"op\":\"add\",\"path\":\"/spec/plugins/-\",\"value\":\"${PLUGIN}\"}]"
+                echo "ACS console plugin enabled"
+              fi

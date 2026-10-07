@@ -1,0 +1,156 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: agentic-updates-build-orchestrator
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  activeDeadlineSeconds: 1800
+  template:
+    metadata:
+      labels:
+        app: agentic-updates-build-orchestrator
+    spec:
+      serviceAccountName: agentic-updates-builder
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: orchestrator
+          image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              NS="{{ .Values.namespace }}"
+
+              wait_for_build() {
+                local name="$1"
+                local timeout="${2:-600}"
+                echo "Waiting for build ${name} (timeout ${timeout}s)..."
+                local elapsed=0
+                while [ $elapsed -lt $timeout ]; do
+                  local phase=$(oc get build "${name}" -n "$NS" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+                  case "$phase" in
+                    Complete) echo "Build ${name} completed"; return 0 ;;
+                    Failed|Error|Cancelled) echo "Build ${name} failed: ${phase}"; return 1 ;;
+                    *) sleep 10; elapsed=$((elapsed + 10)) ;;
+                  esac
+                done
+                echo "Build ${name} timed out after ${timeout}s"
+                return 1
+              }
+
+              get_latest_build() {
+                oc get builds -n "$NS" -l "buildconfig=$1" --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null
+              }
+
+              get_image_ref() {
+                oc get imagestream "$1" -n "$NS" -o jsonpath='{.status.tags[?(@.tag=="latest")].items[0].dockerImageReference}'
+              }
+
+              # ── Step 1: Build agentic-skills and cluster-update console (parallel) ──
+              echo "=== Building agentic-skills and cluster-update console ==="
+              oc start-build agentic-skills -n "$NS"
+              oc start-build cluster-update-console -n "$NS"
+              sleep 5
+              wait_for_build "$(get_latest_build agentic-skills)" &
+              PID1=$!
+              wait_for_build "$(get_latest_build cluster-update-console)" 600 &
+              PID2=$!
+              wait $PID1 $PID2
+              SKILLS_IMAGE=$(get_image_ref agentic-skills)
+              CLUSTER_UPDATE_CONSOLE_IMAGE=$(get_image_ref cluster-update-console-plugin)
+              echo "Skills image: ${SKILLS_IMAGE}"
+              echo "Cluster update console image: ${CLUSTER_UPDATE_CONSOLE_IMAGE}"
+
+              # ── Step 2: Build CVO (needs skills + console plugin image refs) ──
+              echo "=== Building patched CVO ==="
+              CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}')
+              # Get the original release image from clusterversion history (not the current deployment, which may already be patched)
+              ORIGINAL_CVO_IMAGE=$(oc get clusterversion version -o jsonpath='{.status.history[?(@.state=="Completed")].image}' | tr ' ' '\n' | grep 'quay.io' | head -1)
+              if [ -z "$ORIGINAL_CVO_IMAGE" ]; then
+                echo "ERROR: Could not find original release image in clusterversion history"
+                exit 1
+              fi
+              echo "Original CVO image: ${ORIGINAL_CVO_IMAGE}"
+
+              BUILDDIR=$(mktemp -d)
+
+              # Create patch script — runs inside the Dockerfile build (avoids oc exec into CVO pod)
+              printf '%s\n' 'import json,os,sys' 'data=json.load(open(sys.argv[1]))' 'tags={t["name"]:t for t in data["spec"]["tags"]}' 'for n,e in [("agentic-skills","SKILLS_IMAGE"),("cluster-update-console-plugin","CONSOLE_IMAGE")]:' '  img=os.environ[e]' '  if n in tags: tags[n]["from"]["name"]=img' '  else: data["spec"]["tags"].append({"name":n,"from":{"kind":"DockerImage","name":img},"generation":None,"importPolicy":{},"referencePolicy":{"type":""}})' 'json.dump(data,open(sys.argv[2],"w"))' > "${BUILDDIR}/patch-image-references.py"
+
+              # Generate Dockerfile — all patching happens inside the build
+              cat > "${BUILDDIR}/Dockerfile" <<DOCKERFILE
+              FROM registry.access.redhat.com/ubi9/go-toolset:latest AS builder
+              USER root
+              RUN git clone --depth 1 {{ .Values.git.cvo.uri }} /build
+              WORKDIR /build
+              RUN export GOOS=linux GOARCH=amd64 VERSION_OVERRIDE=${CLUSTER_VERSION} && \\
+                  source hack/build-info.sh && \\
+                  CGO_ENABLED=0 hack/build-go.sh
+
+              FROM ${ORIGINAL_CVO_IMAGE} AS stock
+
+              FROM builder AS patcher
+              COPY --from=stock /release-manifests/image-references /tmp/image-references-original
+              COPY --from=stock /release-manifests/release-metadata /tmp/release-metadata
+              COPY patch-image-references.py /tmp/patch-image-references.py
+              ENV SKILLS_IMAGE=${SKILLS_IMAGE}
+              ENV CONSOLE_IMAGE=${CLUSTER_UPDATE_CONSOLE_IMAGE}
+              RUN python3 /tmp/patch-image-references.py /tmp/image-references-original /tmp/image-references-patched
+
+              FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+              COPY --from=builder /build/_output/linux/amd64/cluster-version-operator /build/_output/linux/amd64/cluster-version-operator-tests.gz /usr/bin/
+              COPY --from=builder /build/install /manifests
+              COPY --from=builder /build/vendor/github.com/openshift/api/config/v1/zz_generated.crd-manifests/0000_00_cluster-version-operator_* /manifests/
+              COPY --from=builder /build/vendor/github.com/openshift/api/operator/v1alpha1/zz_generated.crd-manifests/0000_00_cluster-version-operator_* /manifests/
+              COPY --from=builder /build/bootstrap /bootstrap
+              COPY --from=patcher /tmp/release-metadata /release-manifests/release-metadata
+              COPY --from=patcher /tmp/image-references-patched /release-manifests/image-references
+              ENTRYPOINT ["/usr/bin/cluster-version-operator"]
+              DOCKERFILE
+
+              # Remove leading whitespace from heredoc indentation
+              sed -i 's/^              //' "${BUILDDIR}/Dockerfile"
+
+              oc start-build cvo-patched -n "$NS" --from-dir="${BUILDDIR}"
+              sleep 5
+              wait_for_build "$(get_latest_build cvo-patched)" 900
+
+              # ── Step 4: Grant image-puller access ──
+              echo "=== Granting image-puller access ==="
+              oc policy add-role-to-group system:image-puller \
+                system:serviceaccounts:openshift-cluster-version -n "$NS" 2>/dev/null || true
+              oc policy add-role-to-group system:image-puller \
+                system:serviceaccounts:openshift-cluster-update-console-plugin -n "$NS" 2>/dev/null || true
+
+              # ── Step 5: Patch CVO deployment ──
+              echo "=== Patching CVO deployment ==="
+              CVO_IMAGE=$(get_image_ref cvo-patched)
+              oc patch -n openshift-cluster-version deployment cluster-version-operator --type json --patch="[
+                {\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/image\",\"value\":\"${CVO_IMAGE}\"},
+                {\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args/1\",\"value\":\"--release-image=${CVO_IMAGE}\"},
+                {\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/imagePullPolicy\",\"value\":\"Always\"}
+              ]" 2>&1 | grep -v Warning
+              oc rollout status deployment/cluster-version-operator -n openshift-cluster-version --timeout=120s
+
+              # ── Step 6: Patch cluster-update console plugin deployment ──
+              echo "=== Patching cluster-update console plugin ==="
+              CLUSTER_UPDATE_IMAGE=$(get_image_ref cluster-update-console-plugin)
+
+              oc set image deployment/cluster-update-console-plugin \
+                -n openshift-cluster-update-console-plugin plugin="${CLUSTER_UPDATE_IMAGE}"
+
+              oc rollout status deployment/cluster-update-console-plugin -n openshift-cluster-update-console-plugin --timeout=180s
+
+              echo "=== All builds and deployments complete ==="

@@ -1,0 +1,59 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+        - name: jaeger
+          image: quay.io/jaegertracing/jaeger:2.20.0
+          ports:
+            - containerPort: 16686
+              name: ui
+            - containerPort: 4318
+              name: otlp-http
+          env:
+            - name: COLLECTOR_OTLP_ENABLED
+              value: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: jaeger
+spec:
+  selector:
+    app: jaeger
+  ports:
+    - name: ui
+      port: 16686
+    - name: otlp-http
+      port: 4318
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: jaeger
+  namespace: {{ .Release.Namespace }}
+spec:
+  to:
+    kind: Service
+    name: jaeger
+  port:
+    targetPort: ui
+  tls:
+    termination: edge

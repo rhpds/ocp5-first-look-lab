@@ -1,0 +1,14 @@
+nameOverride: ""
+
+clusterName: local-cluster
+
+adminPassword: ""
+
+clusterSubdomain: ""
+
+vmScanning:
+  enabled: true
+
+argocd:
+  enabled: true
+  syncwave: "2"

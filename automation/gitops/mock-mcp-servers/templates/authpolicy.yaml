@@ -1,0 +1,32 @@
+{{- if .Values.auth.clusterSubdomain }}
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: mcp-gateway-auth
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: mcp-gateway-route
+  rules:
+    authentication:
+      keycloak-jwt:
+        jwt:
+          issuerUrl: https://sso.{{ .Values.auth.clusterSubdomain }}/realms/{{ .Values.auth.realm }}
+        credentials:
+          authorizationHeader:
+            prefix: Bearer
+    response:
+      success:
+        filters:
+          identity:
+            json:
+              properties:
+                sub:
+                  expression: auth.identity.sub
+{{- end }}

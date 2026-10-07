@@ -1,0 +1,124 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: generate-acs-mcp-token
+  namespace: {{ .Values.olsNamespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    spec:
+      serviceAccountName: acs-mcp-ols-token
+      restartPolicy: OnFailure
+      containers:
+        - name: generate-token
+          image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -eo pipefail
+              ACS_NS="{{ .Values.acsNamespace }}"
+              OLS_NS="{{ .Values.olsNamespace }}"
+              TOKEN_NAME="ols-mcp-integration"
+              SECRET_NAME="acs-mcp-api-token"
+
+              # Wait for Central to be ready
+              echo "Waiting for ACS Central..."
+              until curl -sk https://central.${ACS_NS}.svc:443/v1/ping; do
+                echo "Central not ready, retrying in 10s..."
+                sleep 10
+              done
+              echo ""
+              echo "Central is ready"
+
+              # Get admin password
+              {{- if .Values.adminPassword }}
+              PASSWORD=$(oc get secret central-admin-password -n "${ACS_NS}" -o jsonpath='{.data.password}' | base64 -d)
+              {{- else }}
+              PASSWORD=$(oc get secret central-htpasswd -n "${ACS_NS}" -o jsonpath='{.data.password}' | base64 -d)
+              {{- end }}
+
+              # Revoke any existing token with the same name
+              EXISTING_ID=$(curl -sk -u "admin:${PASSWORD}" \
+                https://central.${ACS_NS}.svc:443/v1/apitokens 2>/dev/null \
+                | python3 -c "
+              import sys, json
+              d = json.load(sys.stdin)
+              for item in d.get('tokens', []):
+                  if item.get('name') == '${TOKEN_NAME}' and not item.get('revoked', False):
+                      print(item['id'])
+                      break
+              " 2>/dev/null)
+              if [ -n "$EXISTING_ID" ]; then
+                echo "Revoking existing API token (id: ${EXISTING_ID})..."
+                curl -sk -u "admin:${PASSWORD}" \
+                  -X PATCH "https://central.${ACS_NS}.svc:443/v1/apitokens/revoke/${EXISTING_ID}"
+                echo ""
+              fi
+
+              # Generate new API token
+              echo "Generating ACS API token..."
+              TOKEN_RESPONSE=$(curl -sk -u "admin:${PASSWORD}" \
+                -X POST https://central.${ACS_NS}.svc:443/v1/apitokens/generate \
+                -H "Content-Type: application/json" \
+                -d "{\"name\":\"${TOKEN_NAME}\",\"roles\":[\"Analyst\"]}")
+
+              API_TOKEN=$(echo "$TOKEN_RESPONSE" | python3 -c "
+              import sys, json
+              d = json.load(sys.stdin)
+              if 'token' not in d:
+                  print('ERROR: Failed to generate API token', file=sys.stderr)
+                  print(json.dumps(d, indent=2), file=sys.stderr)
+                  sys.exit(1)
+              print(d['token'])
+              ")
+              echo "API token generated successfully"
+
+              # Create secret with the token in openshift-lightspeed namespace
+              echo "Creating secret ${SECRET_NAME} in ${OLS_NS}..."
+              oc create secret generic "${SECRET_NAME}" \
+                -n "${OLS_NS}" \
+                --from-literal=header="Bearer ${API_TOKEN}" \
+                --dry-run=client -o yaml | oc apply -f -
+              echo "Secret created"
+
+              # Patch OLSConfig to add acs-mcp server with secret-based auth
+              echo "Patching OLSConfig to add acs-mcp server..."
+              oc patch olsconfig cluster --type=merge -p '{
+                "spec": {
+                  "mcpServers": [
+                    {
+                      "name": "openshift-mcp",
+                      "url": "http://openshift-mcp-server.openshift-mcp.svc.cluster.local:8080/mcp",
+                      "timeout": 120,
+                      "headers": [
+                        {
+                          "name": "kubernetes-authorization",
+                          "valueFrom": {
+                            "type": "kubernetes"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "name": "acs-mcp",
+                      "url": "https://acs-mcp-server-stackrox-mcp.acs-mcp.svc:443/mcp",
+                      "timeout": 120,
+                      "headers": [
+                        {
+                          "name": "Authorization",
+                          "valueFrom": {
+                            "type": "secret",
+                            "secretRef": {
+                              "name": "acs-mcp-api-token"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }'
+              echo "OLSConfig patched successfully"

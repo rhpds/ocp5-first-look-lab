@@ -1,0 +1,75 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.logDemo.namespace }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: healthy-pod
+  namespace: {{ .Values.logDemo.namespace }}
+  labels:
+    app: mcp-demo
+    scenario: log-retrieval
+    status: healthy
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: logger
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          i=0
+          while true; do
+            i=$((i + 1))
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] INFO  request_id=REQ-${i} method=GET path=/api/health status=200 latency_ms=$((RANDOM % 80 + 10))"
+            sleep 5
+          done
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+  restartPolicy: Always
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: failing-pod
+  namespace: {{ .Values.logDemo.namespace }}
+  annotations:
+    argocd.argoproj.io/ignore-healthcheck: "true"
+  labels:
+    app: mcp-demo
+    scenario: log-retrieval
+    status: failing
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] INFO  Starting application..."
+          echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] INFO  Connecting to postgres://db.internal:5432/appdb"
+          sleep 2
+          echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR Connection timed out (attempt 1/3)"
+          sleep 2
+          echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR Connection timed out (attempt 2/3)"
+          sleep 2
+          echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR Connection timed out (attempt 3/3)"
+          echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] FATAL Database unreachable after 3 retries. Exiting."
+          exit 1
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+  restartPolicy: Always

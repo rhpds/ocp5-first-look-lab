@@ -1,0 +1,38 @@
+{{- range .Values.servers }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .name }}-mcp
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: {{ .name }}-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .name }}-mcp
+  template:
+    metadata:
+      labels:
+        app: {{ .name }}-mcp
+    spec:
+      containers:
+        - name: server
+          image: {{ $.Values.image }}
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: config
+              mountPath: /config
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .name }}-mcp-config
+{{- end }}

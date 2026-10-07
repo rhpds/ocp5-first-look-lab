@@ -1,0 +1,5 @@
+apiVersion: v2
+name: agentic-updates-builds
+description: Build and deploy agentic update components from source
+type: application
+version: 0.1.0

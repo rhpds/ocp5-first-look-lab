@@ -1,0 +1,7 @@
+subscription:
+  channel: fast
+  installPlanApproval: Automatic
+  name: web-terminal
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  namespace: openshift-operators

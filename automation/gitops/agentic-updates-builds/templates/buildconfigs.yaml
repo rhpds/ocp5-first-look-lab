@@ -1,0 +1,59 @@
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: agentic-skills
+  namespace: {{ .Values.namespace }}
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: agentic-skills:latest
+  source:
+    type: Git
+    git:
+      uri: {{ .Values.git.skills.uri }}
+      ref: {{ .Values.git.skills.ref }}
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: cvo-patched
+  namespace: {{ .Values.namespace }}
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: cvo-patched:latest
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+  resources:
+    {{- toYaml .Values.build.resources | nindent 4 }}
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: cluster-update-console
+  namespace: {{ .Values.namespace }}
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: cluster-update-console-plugin:latest
+  source:
+    type: Git
+    git:
+      uri: {{ .Values.git.clusterUpdateConsole.uri }}
+      ref: {{ .Values.git.clusterUpdateConsole.ref }}
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  resources:
+    {{- toYaml .Values.build.resources | nindent 4 }}

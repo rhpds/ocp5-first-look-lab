@@ -1,0 +1,49 @@
+{{- if .Values.llm.apiKey }}
+---
+apiVersion: ols.openshift.io/v1alpha1
+kind: OLSConfig
+metadata:
+  name: cluster
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  featureGates:
+{{- range .Values.featureGates }}
+    - {{ . }}
+{{- end }}
+  llm:
+    providers:
+      - credentialsSecretRef:
+          name: llm-credentials
+        models:
+          - name: {{ .Values.llm.model }}
+        name: {{ .Values.llm.provider }}
+        type: {{ .Values.llm.provider }}
+        url: {{ .Values.llm.apiUrl | quote }}
+  mcpServers:
+{{- range .Values.mcpServers }}
+    - name: {{ .name }}
+      url: {{ .url | quote }}
+      timeout: {{ .timeout }}
+      headers:
+        - name: kubernetes-authorization
+          valueFrom:
+            type: kubernetes
+{{- end }}
+  ols:
+    logLevel: DEBUG
+    maxIterations: 30
+    defaultModel: {{ .Values.llm.model }}
+    defaultProvider: {{ .Values.llm.provider }}
+    deployment: 
+      alertsAdapter:
+        configMapRef:
+          name: alerts-adapter-config
+    conversationCache:
+      type: postgres
+      postgres:
+        sharedBuffers: 256MB
+        maxConnections: 2000
+{{- end }}

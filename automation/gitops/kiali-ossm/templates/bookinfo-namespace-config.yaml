@@ -1,0 +1,10 @@
+{{- if .Values.bookinfo.enabled }}
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: istio-cni
+  namespace: {{ .Values.bookinfo.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+{{- end }}

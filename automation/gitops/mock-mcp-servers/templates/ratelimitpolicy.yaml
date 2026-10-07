@@ -1,0 +1,23 @@
+{{- if .Values.auth.clusterSubdomain }}
+---
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: mcp-gateway-ratelimit
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: mcp-gateway-route
+  limits:
+    per-user:
+      rates:
+        - limit: 30
+          window: 1m
+      counters:
+        - expression: auth.identity.sub
+{{- end }}

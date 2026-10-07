@@ -1,0 +1,15 @@
+{{- if .Values.acs.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "app-of-apps.metadata" (dict "name" "acs-microservices-demo" "namespace" .Values.argocd.namespace "syncWave" "1") }}
+spec:
+  destination:
+    namespace: acs-microservices-demo
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: {{ .Values.gitops.basePath }}acs-microservices-demo
+    repoURL: {{ .Values.gitops.repoURL }}
+    targetRevision: {{ .Values.gitops.targetRevision }}
+{{ include "app-of-apps.syncPolicy" . | indent 2 }}
+{{- end }}

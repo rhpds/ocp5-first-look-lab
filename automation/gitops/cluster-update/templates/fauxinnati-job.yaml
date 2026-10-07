@@ -1,0 +1,32 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fauxinnati
+  namespace: openshift-cluster-version
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  template:
+    metadata:
+      labels:
+        app: fauxinnati
+    spec:
+      serviceAccountName: cluster-version-operator
+      restartPolicy: OnFailure
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: patch
+          image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              echo "Patching ClusterVersion to set upstream and channel..." &&
+              oc patch clusterversion version --type json -p '[{"op": "add", "path": "/spec/upstream", "value": "https://fauxinnati-fauxinnati.apps.ota-stage.q2z4.p1.openshiftapps.com/api/upgrades_info/graph"}, {"op": "add", "path": "/spec/channel", "value": "simple"}]'

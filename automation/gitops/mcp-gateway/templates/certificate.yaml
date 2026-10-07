@@ -1,0 +1,18 @@
+{{- if .Values.gateway.clusterSubdomain }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: mcp-gateway-tls
+  namespace: {{ .Values.gateway.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  secretName: mcp-gateway-tls
+  issuerRef:
+    name: {{ .Values.gateway.tls.clusterIssuer }}
+    kind: ClusterIssuer
+    group: cert-manager.io
+  dnsNames:
+    - mcp.{{ .Values.gateway.clusterSubdomain }}
+{{- end }}

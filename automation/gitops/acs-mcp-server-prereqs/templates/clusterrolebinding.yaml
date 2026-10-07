@@ -1,0 +1,13 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: copy-central-ca
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: copy-central-ca
+subjects:
+  - kind: ServiceAccount
+    name: copy-central-ca
+    namespace: {{ .Values.targetNamespace }}

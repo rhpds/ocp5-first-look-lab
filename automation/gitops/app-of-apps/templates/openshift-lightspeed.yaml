@@ -1,0 +1,49 @@
+{{- if .Values.openshiftAgenticLightspeed.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "app-of-apps.metadata" (dict "name" "openshift-lightspeed" "namespace" .Values.argocd.namespace "syncWave" "1") }}
+spec:
+  ignoreDifferences:
+    - group: ""
+      kind: ConfigMap
+      name: alerts-adapter-config
+      jsonPointers:
+        - /data
+    - group: ols.openshift.io
+      kind: OLSConfig
+      name: cluster
+      jsonPointers:
+        - /spec/llm
+        - /spec/mcpServers
+        - /spec/ols/defaultProvider
+        - /spec/ols/defaultModel
+        - /spec/ols/toolsApprovalConfig
+    - group: ""
+      kind: Secret
+      name: llm-credentials
+      jsonPointers:
+        - /data
+    - group: apps
+      kind: Deployment
+      name: lightspeed-agentic-alerts-adapter
+      jsonPointers:
+        - /spec/selector
+        - /spec/template/metadata/labels
+        - /spec/template/spec
+  destination:
+    namespace: {{ .Values.openshiftAgenticLightspeed.namespace }}
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: {{ .Values.gitops.basePath }}openshift-lightspeed
+    repoURL: {{ .Values.gitops.repoURL }}
+    targetRevision: {{ .Values.gitops.targetRevision }}
+    helm:
+      valuesObject:
+        llm:
+          apiUrl: {{ .Values.openshiftAgenticLightspeed.llm.apiUrl }}
+          apiKey: {{ .Values.openshiftAgenticLightspeed.llm.apiKey }}
+          provider: {{ .Values.openshiftAgenticLightspeed.llm.provider }}
+          model: {{ .Values.openshiftAgenticLightspeed.llm.model }}
+{{ include "app-of-apps.syncPolicy" . | indent 2 }}
+{{- end }}

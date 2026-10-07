@@ -1,0 +1,21 @@
+---
+
+- name: Find bastion host
+  ansible.builtin.set_fact:
+    r_bastion_host: "{{ groups['bastions'] | first | default(bastion_ansible_host | default('localhost')) }}"
+
+- name: Install pip and FastMCP CLI on bastion
+  ansible.builtin.shell: |
+    dnf install -y pip
+    pip3 install fastmcp=={{ ocp5_ea_fastmcp_version }}
+  delegate_to: "{{ r_bastion_host }}"
+  become: true
+  register: r_fastmcp_install
+  retries: 3
+  delay: 10
+  until: r_fastmcp_install is not failed
+
+- name: Verify FastMCP is installed
+  ansible.builtin.command: fastmcp version
+  delegate_to: "{{ r_bastion_host }}"
+  changed_when: false

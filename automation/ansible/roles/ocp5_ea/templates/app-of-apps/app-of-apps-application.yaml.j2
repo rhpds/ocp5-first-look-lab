@@ -1,0 +1,82 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-of-apps
+  namespace: openshift-gitops
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/foreground
+spec:
+  destination:
+    namespace: openshift-gitops
+    server: https://kubernetes.default.svc
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 10m
+      limit: 15
+    syncOptions:
+      - CreateNamespace=true
+      - RespectIgnoreDifferences=true
+  source:
+    repoURL: {{ ocp5_ea_gitops_repo }}
+    targetRevision: {{ ocp5_ea_gitops_repo_tag }}
+    path: {{ ocp5_ea_gitops_repo_base_path }}app-of-apps
+    helm:
+      valuesObject:
+        gitops:
+          repoURL: {{ ocp5_ea_gitops_repo }}
+          targetRevision: {{ ocp5_ea_gitops_repo_tag }}
+          basePath: "{{ ocp5_ea_gitops_repo_base_path }}"
+
+        argocd:
+          namespace: openshift-gitops
+
+        # Placeholder for future operator version pinning via frozen OLM catalog snapshot
+        catalogSource:
+          enabled: {{ ocp5_ea_catalog_source_enabled }}
+          name: {{ ocp5_ea_catalog_source_name }}
+          namespace: {{ ocp5_ea_catalog_source_namespace }}
+          image: {{ ocp5_ea_catalog_source_image }}
+          tag: {{ ocp5_ea_catalog_source_tag }}
+
+        cluster:
+          subdomain: {{ r_openshift_subdomain }}
+          apiServer: {{ r_openshift_api_server }}
+
+        common:
+          password: "{{ common_password }}"
+
+        acs:
+          enabled: true
+          name: {{ ocp5_ea_acs_application_name }}
+          namespace: {{ ocp5_ea_acs_namespace }}
+          clusterName: {{ ocp5_ea_acs_clustername }}
+          adminPassword: {{ ocp5_ea_acs_adminpassword }}
+
+        # Custom console build — disabled since EC6 includes the layout fix
+        consoleBuild:
+          enabled: false
+          name: console-build
+          namespace: console-build
+
+        agenticUpdatesBuilds:
+          enabled: false
+          name: agentic-updates-builds
+          namespace: openshift-lightspeed
+
+        openshiftAgenticLightspeed:
+          enabled: true
+          name: openshift-agentic-lightspeed
+          namespace: openshift-lightspeed
+          llm:
+            apiUrl: "{{ ocp5_ea_llm_api_url }}"
+            apiKey: "{{ ocp5_ea_llm_api_key }}"
+            provider: "{{ ocp5_ea_llm_api_provider }}"
+            model: "{{ ocp5_ea_llm_api_model }}"

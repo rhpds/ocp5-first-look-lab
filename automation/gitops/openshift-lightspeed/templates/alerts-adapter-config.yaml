@@ -1,0 +1,88 @@
+{{- if .Values.agentic.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alerts-adapter-config
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: Prune=false
+data:
+  config.yaml: |
+    # pollInterval: how often to poll AlertManager for firing alerts.
+    # Default: 30s
+    pollInterval: 30s
+
+    # preRunDelay: how long an alert must be firing before an AgenticRun is created.
+    # Filters out transient alerts that resolve on their own.
+    # Default: 0s (no delay)
+    # preRunDelay: 5m
+
+    # postRunDelay: after an AgenticRun reaches a terminal state (Completed, Failed,
+    # Denied, Escalated), how long to wait before creating a new AgenticRun for the
+    # same alert (matched by stable fingerprint label). Avoids repeated analysis of
+    # an alert that has already been investigated.
+    # Default: 1h
+    postRunDelay: 1h
+
+    # filtering: controls which alerts the adapter processes.
+    filtering:
+      # allowedReceivers: only process alerts routed to these receivers (case-insensitive).
+      # No AgenticRuns are created until receivers are explicitly configured.
+      allowedReceivers:
+      #  - critical
+
+    # deduplication: controls how the adapter identifies "the same problem" across
+    # alert re-fires (e.g. pod restarts producing a new pod name).
+    # deduplication:
+    #   # ignoredLabels: labels stripped before computing the stable fingerprint.
+    #   # When set, fully replaces the defaults (no merging).
+    #   # When absent, defaults to: [pod, instance, endpoint, uid]
+    #   # Set to [] to include all labels in the fingerprint.
+    #   ignoredLabels:
+    #     - pod
+    #     - instance
+    #     - endpoint
+    #     - uid
+
+    # tools: shared skills for all workflow steps (maps to spec.tools on the AgenticRun).
+    # When configured, every AgenticRun created by the adapter includes these skills.
+    # Omit to create AgenticRuns with no tools.
+    # tools:
+    #   skills:
+    #     - image: registry.redhat.io/openshift-lightspeed/agentic-skills:latest
+    #       paths:
+    #         - /skills/prometheus
+    #         - /skills/cluster-diagnostics
+
+    # agent: override which agent handles AgenticRun workflow steps.
+    # 'default' sets the agent for all steps; per-step keys override it.
+    # Falls back to the hardcoded "default" agent when omitted.
+    # agent:
+    #   default: "default"
+    #   analysis: "analysis-agent"
+    #   execution: "execution-agent"
+    #   verification: "verification-agent"
+
+    # Per-step tool overrides. When set, these replace the shared tools for that
+    # step on the AgenticRun (maps to spec.{analysis,execution,verification}.tools).
+    analysis:
+      tools:
+        skills:
+          - image: quay.io/openshiftanalytics/agentic-skills:latest
+            paths:
+              - /skills/cluster-troubleshoot/investigate-alert
+    # execution:
+    #   tools:
+    #     skills:
+    #       - image: registry.redhat.io/openshift-lightspeed/exec-skills:latest
+    #         paths:
+    #           - /skills/remediation
+    # verification:
+    #   tools:
+    #     skills:
+    #       - image: registry.redhat.io/openshift-lightspeed/verify-skills:latest
+    #         paths:
+    #           - /skills/validation
+{{- end }}

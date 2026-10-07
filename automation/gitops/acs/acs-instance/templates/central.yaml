@@ -1,0 +1,46 @@
+---
+apiVersion: platform.stackrox.io/v1alpha1
+kind: Central
+metadata:
+  name: stackrox-central-services
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  central:
+    exposure:
+      route:
+        enabled: true
+      loadBalancer:
+        enabled: false
+      nodePort:
+        enabled: false
+{{- if .Values.adminPassword }}
+    adminPasswordSecret:
+      name: central-admin-password
+{{- end }}
+    defaultTLSSecret:
+      name: central-default-tls-cert
+    persistence:
+      persistentVolumeClaim:
+        claimName: stackrox-db
+{{- if .Values.vmScanning.enabled }}
+  customize:
+    envVars:
+      - name: ROX_VIRTUAL_MACHINES
+        value: "true"
+      - name: ROX_INIT_CONTAINER_SUPPORT
+        value: "true"
+      - name: ROX_POLICY_FILTERS_UI
+        value: "true"
+{{- end }}
+  egress:
+    connectivityPolicy: Online
+  scanner:
+    analyzer:
+      scaling:
+        autoScaling: Enabled
+        maxReplicas: 5
+        minReplicas: 2
+        replicas: 3
+    scannerComponent: Enabled

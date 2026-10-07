@@ -1,0 +1,16 @@
+{{- if .Values.catalogSource.enabled }}
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: {{ .Values.catalogSource.name }}
+  namespace: {{ .Values.namespace }}
+  annotations:
+    {{- include "acs-operator.argocd-syncwave" . | nindent 4 }}
+spec:
+  sourceType: grpc
+  image: {{ .Values.catalogSource.image }}
+  displayName: {{ .Values.catalogSource.displayName }}
+  grpcPodConfig:
+    securityContextConfig: restricted
+{{- end }}

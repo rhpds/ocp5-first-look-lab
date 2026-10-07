@@ -1,0 +1,19 @@
+{{- if .Values.clusterUpdate.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "app-of-apps.metadata" (dict "name" .Values.clusterUpdate.name "namespace" .Values.argocd.namespace "syncWave" "2") }}
+spec:
+  destination:
+    namespace: {{ .Values.clusterUpdate.namespace }}
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: {{ .Values.gitops.basePath }}cluster-update
+    repoURL: {{ .Values.gitops.repoURL }}
+    targetRevision: {{ .Values.gitops.targetRevision }}
+    helm:
+      valuesObject:
+        subscription:
+          source: {{ include "app-of-apps.operatorSource" . }}
+{{ include "app-of-apps.syncPolicy" . | indent 2 }}
+{{- end }}

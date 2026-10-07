@@ -1,0 +1,160 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mcp-server-keycloak-setup
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    metadata:
+      labels:
+        app: mcp-server-keycloak-setup
+    spec:
+      serviceAccountName: keycloak-mcp-server-setup
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: setup
+          image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -eo pipefail
+
+              NAMESPACE="{{ .Release.Namespace }}"
+              SECRET_NAME="mcp-user-credentials"
+              SSO_URL="https://sso.{{ .Values.clusterSubdomain }}"
+              REALM="keycloak"
+              echo "Keycloak URL: ${SSO_URL}"
+
+              ADMIN_USER=$(oc get secret keycloak-initial-admin -n keycloak -o jsonpath='{.data.username}' | base64 -d)
+              ADMIN_PASS=$(oc get secret keycloak-initial-admin -n keycloak -o jsonpath='{.data.password}' | base64 -d)
+
+              ADMIN_TOKEN=$(curl -sk -X POST "${SSO_URL}/realms/master/protocol/openid-connect/token" \
+                -d "grant_type=password&client_id=admin-cli&username=${ADMIN_USER}&password=${ADMIN_PASS}" | \
+                python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+              # Generate or retrieve passwords
+              generate_password() {
+                dd if=/dev/urandom bs=32 count=1 2>/dev/null | base64 | tr -dc 'a-zA-Z0-9' | head -c 16 || true
+              }
+
+              if oc get secret "${SECRET_NAME}" -n "${NAMESPACE}" >/dev/null 2>&1; then
+                echo "Secret ${SECRET_NAME} exists, reading passwords..."
+                {{- range .Values.users }}
+                PASS_{{ .username | upper | replace "-" "_" }}=$(oc get secret "${SECRET_NAME}" -n "${NAMESPACE}" -o jsonpath='{.data.{{ .username }}}' | base64 -d)
+                {{- end }}
+              else
+                echo "Secret ${SECRET_NAME} does not exist, generating passwords..."
+                {{- range .Values.users }}
+                PASS_{{ .username | upper | replace "-" "_" }}=$(generate_password)
+                {{- end }}
+                oc create secret generic "${SECRET_NAME}" -n "${NAMESPACE}" \
+                  {{- range .Values.users }}
+                  --from-literal={{ .username }}="${PASS_{{ .username | upper | replace "-" "_" }}}" \
+                  {{- end }}
+                  --dry-run=client -o yaml | oc apply -f -
+                echo "Secret ${SECRET_NAME} created"
+              fi
+
+              {{- range .Values.users }}
+              USER_PASS="${PASS_{{ .username | upper | replace "-" "_" }}}"
+              EXISTING=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/users?username={{ .username }}&exact=true" \
+                -H "Authorization: Bearer ${ADMIN_TOKEN}" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+              if [ "$EXISTING" = "0" ]; then
+                echo "Creating user {{ .username }}..."
+                curl -sk -X POST "${SSO_URL}/admin/realms/${REALM}/users" \
+                  -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"username\":\"{{ .username }}\",\"enabled\":true,\"emailVerified\":true,\"email\":\"{{ .email }}\",\"firstName\":\"{{ .firstName }}\",\"lastName\":\"{{ .lastName }}\",\"credentials\":[{\"type\":\"password\",\"value\":\"${USER_PASS}\",\"temporary\":false}]}"
+                echo "User {{ .username }} created"
+              else
+                echo "User {{ .username }} already exists, updating password..."
+                USER_ID=$(curl -sk "${SSO_URL}/admin/realms/${REALM}/users?username={{ .username }}&exact=true" \
+                  -H "Authorization: Bearer ${ADMIN_TOKEN}" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])")
+                curl -sk -X PUT "${SSO_URL}/admin/realms/${REALM}/users/${USER_ID}/reset-password" \
+                  -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"type\":\"password\",\"value\":\"${USER_PASS}\",\"temporary\":false}"
+                echo "User {{ .username }} password updated"
+              fi
+              {{- end }}
+
+              echo "MCP server user setup complete"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: keycloak-mcp-server-setup
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: keycloak-mcp-server-setup
+  namespace: keycloak
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["keycloak-initial-admin"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: keycloak-mcp-server-setup
+  namespace: keycloak
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+subjects:
+  - kind: ServiceAccount
+    name: keycloak-mcp-server-setup
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: keycloak-mcp-server-setup
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: keycloak-mcp-server-credentials
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: keycloak-mcp-server-credentials
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+subjects:
+  - kind: ServiceAccount
+    name: keycloak-mcp-server-setup
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: keycloak-mcp-server-credentials
+  apiGroup: rbac.authorization.k8s.io

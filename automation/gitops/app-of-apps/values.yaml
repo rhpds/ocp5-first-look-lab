@@ -1,0 +1,97 @@
+gitops:
+  repoURL: https://github.com/rhpds/ocp5-first-look-lab.git
+  targetRevision: main
+  basePath: ""
+
+argocd:
+  namespace: openshift-gitops
+
+# OLM catalog snapshot — v5.0 index dropped several operators we depend on
+catalogSource:
+  enabled: true
+  name: redhat-operators-v422
+  namespace: openshift-marketplace
+  image: quay.io/rhpds/olm_snapshot_redhat_catalog
+  tag: v4.22_2026_08_03
+
+cluster:
+  subdomain: ""
+  apiServer: ""
+
+common:
+  password: ""
+
+acs:
+  enabled: true
+  name: acs
+  namespace: acs
+  clusterName: local-cluster
+  adminPassword: ""
+
+acsVirt:
+  enabled: true
+  name: acs-virt
+  namespace: acs-virt
+
+clusterObservability:
+  enabled: true
+  name: cluster-observability
+  namespace: openshift-operators
+
+clusterUpdate:
+  enabled: true
+  name: cluster-update
+  namespace: openshift-cluster-version
+
+mcpGateway:
+  enabled: true
+  name: mcp-gateway
+  namespace: mcp-gateway
+
+acsMcpServer:
+  enabled: true
+  name: acs-mcp-server
+  namespace: acs-mcp
+
+openshiftMcpServer:
+  enabled: true
+  name: openshift-mcp-server
+  namespace: openshift-mcp
+
+webTerminal:
+  enabled: true
+  name: web-terminal
+  namespace: openshift-operators
+
+mockMcpServers:
+  enabled: true
+  name: mock-mcp-servers
+  namespace: mock-mcp-servers
+
+kialiOssm:
+  enabled: true
+  name: kiali-ossm
+  namespace: istio-system
+
+
+# Custom console build — was needed for EC5 to pick up the virtualized table
+# layout fix (openshift/console#16798). Disabled since EC6 includes the fix.
+consoleBuild:
+  enabled: false
+  name: console-build
+  namespace: console-build
+
+openshiftLightspeedTroubleshooting:
+  enabled: true
+  name: openshift-lightspeed-troubleshooting
+  namespace: inventory
+
+openshiftAgenticLightspeed:
+  enabled: true
+  name: openshift-agentic-lightspeed
+  namespace: openshift-lightspeed
+  llm:
+    apiUrl: ""
+    apiKey: ""
+    provider: ""
+    model: ""

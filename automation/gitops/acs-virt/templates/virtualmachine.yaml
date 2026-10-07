@@ -1,0 +1,51 @@
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: {{ .Values.vm.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  runStrategy: Always
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: {{ .Values.vm.name }}
+    spec:
+      domain:
+        cpu:
+          cores: 2
+          sockets: 1
+          threads: 1
+        devices:
+          autoattachVSOCK: true
+          disks:
+            - name: containerdisk
+              bootOrder: 1
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              bootOrder: 2
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}
+        memory:
+          guest: 4Gi
+        resources:
+          requests:
+            memory: 4Gi
+            cpu: "2"
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        - name: containerdisk
+          containerDisk:
+            image: {{ .Values.vm.image }}
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            secretRef:
+              name: {{ .Values.vm.name }}-cloudinit

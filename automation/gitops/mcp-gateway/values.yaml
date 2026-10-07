@@ -1,0 +1,44 @@
+subscription:
+  channel: preview
+  installPlanApproval: Automatic
+  name: mcp-gateway
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+
+gateway:
+  name: mcp-gateway
+  namespace: openshift-ingress
+  gatewayClassName: openshift-default
+  tls:
+    clusterIssuer: zerossl-production-aws
+
+keycloak:
+  realm: keycloak
+  clientId: mcp-gateway
+  clientSecret: mcp-gateway-secret
+  serverNamespace: mock-mcp-servers
+  servers:
+    - name: inventory
+      tools: [list_products, get_product, check_stock_alerts, update_quantity, search_products]
+    - name: payments
+      tools: [list_transactions, get_transaction, process_refund, get_daily_summary, check_payment_status]
+    - name: accounts
+      tools: [list_accounts, get_account, get_account_history, update_credit_limit, check_credit_available]
+  groups:
+    - name: team-a
+      servers: [inventory, accounts]
+    - name: team-b
+      servers: [payments]
+  users:
+    - username: user1
+      password: user1pass
+      email: user1@example.com
+      firstName: MCP
+      lastName: User1
+      group: team-a
+    - username: user2
+      password: user2pass
+      email: user2@example.com
+      firstName: MCP
+      lastName: User2
+      group: team-b

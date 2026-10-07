@@ -1,0 +1,21 @@
+namespace: openshift-lightspeed
+
+git:
+  skills:
+    uri: https://github.com/openshift/agentic-skills.git
+    ref: main
+  cvo:
+    uri: https://github.com/openshift/cluster-version-operator.git
+    ref: main
+  clusterUpdateConsole:
+    uri: https://github.com/openshift/cluster-update-console-plugin.git
+    ref: main
+
+build:
+  resources:
+    limits:
+      cpu: "4"
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      memory: 4Gi

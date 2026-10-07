@@ -1,0 +1,29 @@
+---
+apiVersion: mcp.kuadrant.io/v1alpha1
+kind: MCPGatewayExtension
+metadata:
+  name: mock-mcp-extension
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  privateHost: "http://mcp-gateway-openshift-default.openshift-ingress.svc.cluster.local:80"
+{{- if .Values.auth.clusterSubdomain }}
+  oauthProtectedResource:
+    authorizationServers:
+      - https://sso.{{ .Values.auth.clusterSubdomain }}/realms/{{ .Values.auth.realm }}
+    resourceName: "MCP Gateway"
+    bearerMethodsSupported:
+      - header
+    scopesSupported:
+      - openid
+      - roles
+      - groups
+{{- end }}
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: {{ .Values.gateway.name }}
+    namespace: {{ .Values.gateway.namespace }}
+    sectionName: mcp

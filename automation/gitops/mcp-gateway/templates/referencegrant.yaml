@@ -1,0 +1,22 @@
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-mcp-servers
+  namespace: {{ .Values.gateway.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: mock-mcp-servers
+    - group: mcp.kuadrant.io
+      kind: MCPGatewayExtension
+      namespace: mock-mcp-servers
+    - group: kuadrant.io
+      kind: AuthPolicy
+      namespace: mock-mcp-servers
+  to:
+    - group: gateway.networking.k8s.io
+      kind: Gateway

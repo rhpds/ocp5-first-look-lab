@@ -1,0 +1,21 @@
+{{- if .Values.agentic.enabled }}
+{{- if .Values.llm.apiKey }}
+---
+apiVersion: agentic.openshift.io/v1alpha1
+kind: Agent
+metadata:
+  name: default
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  llmProvider:
+    name: openai
+  model: {{ .Values.llm.model | quote }}
+  timeouts:
+    analysisSeconds: 120
+    executionSeconds: 120
+    verificationSeconds: 120
+{{- end }}
+{{- end }}

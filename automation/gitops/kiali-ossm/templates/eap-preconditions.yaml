@@ -1,0 +1,86 @@
+{{- if and .Values.bookinfo.enabled .Values.eapPreconditions.enabled }}
+{{- $ns := .Values.bookinfo.namespace }}
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: reviews
+  namespace: {{ $ns }}
+  labels:
+    eap.kiali.io/test: eap-preconditions
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  host: reviews.{{ $ns }}.svc.cluster.local
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: v2
+    labels:
+      version: v2
+  - name: v3
+    labels:
+      version: v3
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: reviews
+  namespace: {{ $ns }}
+  labels:
+    eap.kiali.io/test: eap-preconditions
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  hosts:
+  - reviews.{{ $ns }}.svc.cluster.local
+  http:
+  - route:
+    - destination:
+        host: reviews.{{ $ns }}.svc.cluster.local
+        subset: v1
+      weight: 100
+    - destination:
+        host: reviews.{{ $ns }}.svc.cluster.local
+        subset: v2
+      weight: 0
+    - destination:
+        host: reviews.{{ $ns }}.svc.cluster.local
+        subset: v3
+      weight: 0
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: eap-bookinfo-traffic
+  namespace: {{ $ns }}
+  labels:
+    eap.kiali.io/test: eap-preconditions
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 900
+  template:
+    metadata:
+      labels:
+        eap.kiali.io/test: eap-preconditions
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: curl
+        image: curlimages/curl:8.5.0
+        command:
+        - sh
+        - -c
+        - |
+          set +e
+          for i in $(seq 1 60); do
+            curl -sS -o /dev/null --connect-timeout 2 \
+              http://productpage.{{ $ns }}.svc.cluster.local:9080/productpage || true
+            sleep 1
+          done
+{{- end }}

@@ -1,0 +1,218 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: s4-data
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    app: s4
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: s4-config
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    app: s4
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
+data:
+  S3_ENDPOINT: "http://localhost:7480"
+  S3_REGION: "us-east-1"
+  SERVER_PORT: "5000"
+  SERVER_IP: "0.0.0.0"
+  STORAGE_MAX_FILE_SIZE_GB: "5"
+  STORAGE_MAX_CONCURRENT_TRANSFERS: "2"
+  AUTH_ENABLED: "false"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s4
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    app: s4
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: s4
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: s4
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+      - name: s4
+        image: quay.io/rh-aiservices-bu/s4:latest
+        imagePullPolicy: Always
+        ports:
+        - name: s3-api
+          containerPort: 7480
+        - name: web-ui
+          containerPort: 5000
+        envFrom:
+        - configMapRef:
+            name: s4-config
+        - secretRef:
+            name: s4-credentials
+        volumeMounts:
+        - name: s4-data
+          mountPath: /var/lib/ceph/radosgw
+        readinessProbe:
+          httpGet:
+            path: /api
+            port: 5000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api
+            port: 5000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+      volumes:
+      - name: s4-data
+        persistentVolumeClaim:
+          claimName: s4-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: s4
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    app: s4
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 7480
+    targetPort: 7480
+    protocol: TCP
+    name: s3-api
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: web-ui
+  selector:
+    app: s4
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s4-credentials
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    app: s4
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: {{ .Values.s4.accessKeyId | quote }}
+  AWS_SECRET_ACCESS_KEY: {{ .Values.s4.accessKeySecret | quote }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.s4.tempoSecretName }}
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    app: s4
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
+type: Opaque
+stringData:
+  bucket: {{ .Values.s4.bucketName }}
+  endpoint: {{ .Values.s4.endpoint }}
+  access_key_id: {{ .Values.s4.accessKeyId }}
+  access_key_secret: {{ .Values.s4.accessKeySecret }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: s4-create-bucket
+  namespace: {{ .Values.tempo.namespace }}
+  labels:
+    app: s4
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    metadata:
+      labels:
+        app: s4-create-bucket
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+      containers:
+      - name: create-bucket
+        image: registry.access.redhat.com/ubi9/ubi:latest
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          python3 -c "
+          import urllib.request, urllib.error, hashlib, hmac, base64
+          from datetime import datetime
+          access_key = '{{ .Values.s4.accessKeyId }}'
+          secret_key = '{{ .Values.s4.accessKeySecret }}'
+          endpoint = 'http://s4:7480'
+          bucket = '{{ .Values.s4.bucketName }}'
+          date_str = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')
+          string_to_sign = f'PUT\n\n\n{date_str}\n/{bucket}'
+          sig = hmac.new(secret_key.encode(), string_to_sign.encode(), hashlib.sha1)
+          signature = base64.b64encode(sig.digest()).decode()
+          req = urllib.request.Request(f'{endpoint}/{bucket}', method='PUT')
+          req.add_header('Date', date_str)
+          req.add_header('Authorization', f'AWS {access_key}:{signature}')
+          try:
+              resp = urllib.request.urlopen(req)
+              print(f'Bucket {bucket} created: {resp.status}')
+          except urllib.error.HTTPError as e:
+              body = e.read().decode()
+              if 'BucketAlreadyExists' in body or 'BucketAlreadyOwnedByYou' in body:
+                  print(f'Bucket {bucket} already exists')
+              else:
+                  raise
+          "
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault

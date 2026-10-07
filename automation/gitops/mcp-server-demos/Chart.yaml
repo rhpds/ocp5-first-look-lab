@@ -1,0 +1,5 @@
+apiVersion: v2
+name: mcp-server-demos
+description: Demo fixtures for MCP server hands-on exercises (log retrieval, metrics, netedge)
+type: application
+version: 0.1.0

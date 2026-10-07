@@ -1,0 +1,21 @@
+---
+apiVersion: sailoperator.io/v1
+kind: Istio
+metadata:
+  name: default
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  {{- if .Values.istio.version }}
+  version: {{ .Values.istio.version }}
+  {{- end }}
+  namespace: {{ .Values.istio.namespace }}
+  updateStrategy:
+    type: RevisionBased
+  profile: demo
+  values:
+    meshConfig:
+      defaultConfig:
+        tracing:
+          zipkin:
+            address: tempo-tempo-distributor.{{ .Values.tempo.namespace }}:9411

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: console-build
+description: Build and deploy custom OpenShift console from source
+type: application
+version: 0.1.0

@@ -1,0 +1,60 @@
+{{- if .Values.openshiftAgenticLightspeed.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "app-of-apps.metadata" (dict "name" .Values.openshiftAgenticLightspeed.name "namespace" .Values.argocd.namespace "syncWave" "2") }}
+spec:
+  destination:
+    namespace: {{ .Values.openshiftAgenticLightspeed.namespace }}
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: {{ .Values.gitops.basePath }}openshift-agentic-lightspeed
+    repoURL: {{ .Values.gitops.repoURL }}
+    targetRevision: {{ .Values.gitops.targetRevision }}
+    helm:
+      valuesObject:
+        llm:
+          apiUrl: {{ .Values.openshiftAgenticLightspeed.llm.apiUrl }}
+          apiKey: {{ .Values.openshiftAgenticLightspeed.llm.apiKey }}
+          provider: {{ .Values.openshiftAgenticLightspeed.llm.provider }}
+          model: {{ .Values.openshiftAgenticLightspeed.llm.model }}
+  ignoreDifferences:
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+      name: lightspeed-agent-cluster-reader
+      jsonPointers:
+        - /subjects
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+      name: lightspeed-agent-monitoring-view
+      jsonPointers:
+        - /subjects
+    - group: agentic.openshift.io
+      kind: ApprovalPolicy
+      name: cluster
+      jsonPointers:
+        - /spec/stages
+    - group: agentic.openshift.io
+      kind: LLMProvider
+      name: openai
+      jsonPointers:
+        - /spec
+    - group: ""
+      kind: Secret
+      name: llm-creds-openai
+      jsonPointers:
+        - /data
+    - group: agentic.openshift.io
+      kind: Agent
+      name: default
+      jsonPointers:
+        - /spec/llmProvider
+        - /spec/model
+    - group: agentic.openshift.io
+      kind: Agent
+      name: smart
+      jsonPointers:
+        - /spec/llmProvider
+        - /spec/model
+{{ include "app-of-apps.syncPolicy" . | indent 2 }}
+{{- end }}

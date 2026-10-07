@@ -1,0 +1,28 @@
+{{- if .Values.openshiftLightspeedTroubleshooting.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+{{ include "app-of-apps.metadata" (dict "name" .Values.openshiftLightspeedTroubleshooting.name "namespace" .Values.argocd.namespace "syncWave" "2") }}
+spec:
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: reporting-service
+      namespace: payments
+      jsonPointers:
+        - /spec/template/spec/containers/0/image
+    - group: apps
+      kind: Deployment
+      name: inventory-app
+      namespace: inventory
+      jsonPointers:
+        - /spec/template/spec/containers/0/image
+  destination:
+    namespace: {{ .Values.openshiftLightspeedTroubleshooting.namespace }}
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: {{ .Values.gitops.basePath }}openshift-lightspeed-troubleshooting
+    repoURL: {{ .Values.gitops.repoURL }}
+    targetRevision: {{ .Values.gitops.targetRevision }}
+{{ include "app-of-apps.syncPolicy" . | indent 2 }}
+{{- end }}

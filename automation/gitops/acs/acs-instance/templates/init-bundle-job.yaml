@@ -1,0 +1,83 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cluster-registration-secret-generator
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    spec:
+      serviceAccountName: cluster-registration-secret-generator
+      restartPolicy: OnFailure
+      containers:
+        - name: crs-generator
+          image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -eo pipefail
+              NAMESPACE="{{ .Release.Namespace }}"
+              # Wait for Central to be ready
+              echo "Waiting for Central..."
+              until curl -sk https://central.${NAMESPACE}.svc:443/v1/ping; do
+                echo "Central not ready, retrying in 10s..."
+                sleep 10
+              done
+              echo "Central is ready"
+
+              # Check if cluster-registration-secret already exists
+              if oc get secret cluster-registration-secret -n "${NAMESPACE}" &>/dev/null; then
+                echo "Cluster registration secret already exists, skipping"
+                exit 0
+              fi
+
+              # Get admin password
+{{- if .Values.adminPassword }}
+              PASSWORD=$(oc get secret central-admin-password -n "${NAMESPACE}" -o jsonpath='{.data.password}' | base64 -d)
+{{- else }}
+              PASSWORD=$(oc get secret central-htpasswd -n "${NAMESPACE}" -o jsonpath='{.data.password}' | base64 -d)
+{{- end }}
+
+              # Revoke any existing CRS with the same name (from a previous failed run)
+              EXISTING_ID=$(curl -sk -u "admin:${PASSWORD}" \
+                https://central.${NAMESPACE}.svc:443/v1/cluster-init/crs 2>/dev/null \
+                | python3 -c "
+              import sys, json
+              d = json.load(sys.stdin)
+              for item in d.get('items', []):
+                  if item.get('name') == '{{ .Values.clusterName }}':
+                      print(item['id'])
+                      break
+              " 2>/dev/null)
+              if [ -n "$EXISTING_ID" ]; then
+                echo "Revoking existing CRS (id: ${EXISTING_ID})..."
+                curl -sk -u "admin:${PASSWORD}" \
+                  -X PATCH https://central.${NAMESPACE}.svc:443/v1/cluster-init/crs/revoke \
+                  -H "Content-Type: application/json" \
+                  -d "{\"ids\":[\"${EXISTING_ID}\"]}"
+                echo ""
+              fi
+
+              # Generate a Cluster Registration Secret (CRS) via the Central API
+              CRS_RESPONSE=$(curl -sk -u "admin:${PASSWORD}" \
+                -X POST https://central.${NAMESPACE}.svc:443/v1/cluster-init/crs \
+                -H "Content-Type: application/json" \
+                -d '{"name":"{{ .Values.clusterName }}"}')
+
+              # Decode the CRS YAML and apply it
+              CRS_YAML=$(echo "$CRS_RESPONSE" | python3 -c "
+              import sys, json, base64
+              d = json.load(sys.stdin)
+              if 'crs' not in d:
+                  print('ERROR: Failed to generate CRS', file=sys.stderr)
+                  print(json.dumps(d, indent=2), file=sys.stderr)
+                  sys.exit(1)
+              print(base64.b64decode(d['crs']).decode())
+              ")
+              echo "$CRS_YAML" | oc apply -n "${NAMESPACE}" -f -
+
+              echo "Cluster registration secret created successfully"
