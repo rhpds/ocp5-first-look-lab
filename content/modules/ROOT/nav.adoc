@@ -1,2 +1,4 @@
 * xref:index.adoc[Lab Overview]
-* xref:module-01-intelligent-openshift.adoc[Intelligent OpenShift]
+* xref:module-01-agentic-troubleshooting.adoc[Agentic Troubleshooting]
+* xref:module-02-mcp-server.adoc[MCP Server]
+* xref:module-03-mcp-gateway.adoc[MCP Gateway]

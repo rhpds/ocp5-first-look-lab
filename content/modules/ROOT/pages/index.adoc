@@ -1,74 +1,87 @@
-= Red Hat OpenShift 5: First Look
-:page-layout: home
+= OpenShift 5 First Look lab
 
-== Lab Overview
+include::partial$_attributes.adoc[]
 
-This two-hour hands-on lab introduces the key capabilities of Red Hat OpenShift 5.
-You work directly on a pre-deployed OCP 5 cluster and complete four confirmed modules covering AI-assisted operations, the redesigned install and upgrade path, RHCOS 10's image-based lifecycle, and the expanded security stack.
+== Introduction
 
-[cols="1,3,1",options="header"]
+Welcome to the *OpenShift 5 First Look lab*. You have been given access
+to a fully provisioned OpenShift 5 cluster with several new and updated
+features pre-installed and configured.
+
+WARNING: This cluster is owned and operated by Red Hat. *Do not* enter any confidential, non-public, or personally identifiable information (PII) into this environment — including prompts, data, credentials, or any content you would not otherwise share publicly. For more information, refer to the https://www.redhat.com/en/about/all-policies-guidelines[Red Hat Policies and Guidelines^].
+
+This lab will alow you to explore the new capabilities of OpenShift 5, covering these main feature areas:
+
+* *Agentic Troubleshooting* — Automated root-cause analysis and remediation of application issues triggered by alerts
+* *MCP Server* — Model Context Protocol servers for OpenShift and ACS, enabling AI agents to interact with cluster and security APIs
+* *MCP Gateway* — Part of Red Hat Connectivity Link, providing federated MCP access, team isolation, authentication, and policy enforcement
+
+== Credentials
+
+NOTE: Some passwords are not listed here for security reasons. Refer to the credentials given to you for the Early Access Program.
+
+[cols="1,1,1,1"]
 |===
-| Module | Topic | Duration
+| *Service* | *Username* | *Password* | *Link*
 
-| 1
-| xref:module-01-intelligent-openshift.adoc[Intelligent OpenShift] — MCP server, agentic troubleshooting, Perses dashboards, upgrade risk analysis
-| 35 min
+| OpenShift Console
+| `{openshift_cluster_admin_username}`
+| (see EAP credentials)
+| {openshift_cluster_console_url}[Console^]
 
-| 2
-| Install & Upgrade — Operator Update Planner, Agent Installer, disconnected deployment
-| 30 min
+| OpenShift GitOps (Argo CD)
+| `{gitops_user}`
+| (click "Log in via OpenShift")
+| https://openshift-gitops-server-openshift-gitops.{openshift_cluster_ingress_domain}[Argo CD^]
 
-| 3
-| RHCOS 10 — bootc image lifecycle, day-2 OS update flow, immutability
-| 15 min
-
-| 4
-| Security, Sovereign & Disconnected — oc mirror v2 delta mirroring, post-quantum cryptography
-| 20 min
 |===
 
-No OCP 5 experience is required.
-Familiarity with OpenShift 4 operations (deploying workloads, using the `oc` CLI, managing Operators) is assumed.
+== Using This Environment
 
-== Why This Workshop Matters
+Your environment is split into two panels:
 
-OpenShift 5 is a significant release — not an incremental update.
-It introduces structural changes across four areas that your customers will ask about before they plan an upgrade:
+* *Left panel* — these instructions. Use the navigation on the left side to move between exercises and appendices.
+* *Right panel* — a terminal that is already logged in to your OpenShift cluster as `cluster-admin`. You can run `oc` commands directly here without any additional authentication.
 
-*AI as a platform feature, not a plugin.*
-The MCP server and gateway ship as part of the OCP 5 control plane.
-Any MCP-compatible AI client can connect, invoke live cluster tools, and drive autonomous workflows — without custom agents or sidecar deployments.
-Agentic troubleshooting, on-demand dashboard generation, and upgrade risk scanning are available to every OCP 5 cluster out of the box.
+=== Running Commands
 
-*A new install and upgrade story.*
-The OCP 4→5 upgrade path is architecturally different from minor-version upgrades.
-The Operator Update Planner removes the manual compatibility research that blocked customers from upgrading confidently.
-The Agent Installer now supports fully disconnected deployments with no dependency on an external image registry at install time.
+Throughout these instructions, you will see command blocks with a small *play button* (▶) in the upper-left corner:
 
-*RHCOS 10 and the bootc lifecycle.*
-Red Hat CoreOS 10 replaces rpm-ostree with a bootc image-based model.
-Node OS updates are now atomic, rollback-capable, and do not require full node reprovisioning.
-This changes how customers plan maintenance windows and reason about node compliance.
+[source,sh,role=execute]
+----
+oc get pods -n openshift-lightspeed
+----
 
-*Security hardening that customers will require.*
-Post-quantum cryptography cipher suite support on the API server and ingress controller is a forward-looking requirement for regulated industries.
-oc mirror v2 delta mirroring dramatically reduces the bandwidth and time needed to keep disconnected Operator catalogs current.
+Click the *play button* to automatically execute the command in the terminal on the right — no copy/paste needed.
 
-Completing this lab gives you hands-on evidence for each of these areas — not slide content, but terminal output and console screenshots you can use directly in customer conversations.
+Some blocks (such as URLs, JSON configurations, or PromQL queries) show a *copy icon* instead — click it to copy the text to your clipboard for pasting elsewhere.
 
-== What You Will Need
+TIP: You can also type commands directly into the terminal. The terminal supports standard shell features like command history (kbd:[Up] / kbd:[Down] arrows), tab completion (kbd:[Tab]), and kbd:[Ctrl+C] to cancel a running command.
 
-The lab environment provides everything:
+=== Accessing Consoles
 
-* A pre-deployed OCP 5 multinode cluster
-* The MCP gateway pre-exposed and accessible from the lab terminal
-* A MaaS endpoint pre-configured for agentic operations
-* A pre-broken workload for the agentic troubleshooting exercise
-* Pre-staged disconnected content for the Agent Installer walkthrough
-* All required Operators installed
+Above the terminal on the right side, you will see tabs for different consoles. Clicking a tab opens the corresponding console in a new browser tab:
 
-Your credentials and gateway URL are in the *Lab Credentials* panel on the right side of the screen.
+* *Terminal* — the default view, already logged in to your cluster as `cluster-admin`
+* *OpenShift Console* — the OpenShift web console for UI-based exercises (viewing alerts, managing virtualization, reviewing ArgoCD applications, etc.)
+* *OpenShift GitOps* — the Argo CD console for viewing application deployments and sync status. Click *Log in via OpenShift* and use the OpenShift credentials from the table above.
 
-== Ready to Start
+Use the credentials from the table above to log in to each console.
 
-xref:module-01-intelligent-openshift.adoc[Begin Module 1 — Intelligent OpenShift →]
+=== Using Your Own Tools
+
+If you prefer to use your own local tools (e.g., `oc` CLI from your laptop, IDE extensions, or AI clients like Claude Desktop or Cursor), you can obtain login credentials from the OpenShift console:
+
+1. Click your username in the top-right corner of the OpenShift console
+2. Select *Copy login command*
+3. Use the displayed `oc login` command on your local machine
+
+You have full `cluster-admin` access, so you are free to explore beyond the guided exercises.
+
+CAUTION: This environment is managed by OpenShift GitOps (Argo CD). If you change configurations that ArgoCD manages, they will be automatically reverted within a few minutes. If you need to make persistent changes for testing, you can pause auto-sync on the relevant ArgoCD application first (see xref:byom.adoc[Appendix A] for an example).
+
+== Modules
+
+* xref:module-01-agentic-troubleshooting.adoc[Agentic Troubleshooting]
+* xref:module-02-mcp-server.adoc[MCP Server]
+* xref:module-03-mcp-gateway.adoc[MCP Gateway]
