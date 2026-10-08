@@ -15,6 +15,7 @@ istio:
   namespace: istio-system
   cniNamespace: istio-cni
   revision: default-v1-30-5
+  gatewayServiceType: ClusterIP
 
 s4:
   accessKeyId: s4admin

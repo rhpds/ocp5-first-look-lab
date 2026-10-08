@@ -21,6 +21,14 @@ spec:
 {{- end }}
     defaultTLSSecret:
       name: central-default-tls-cert
+    db:
+      resources:
+        requests:
+          cpu: {{ .Values.centralDb.resources.requests.cpu | quote }}
+          memory: {{ .Values.centralDb.resources.requests.memory | quote }}
+        limits:
+          cpu: {{ .Values.centralDb.resources.limits.cpu | quote }}
+          memory: {{ .Values.centralDb.resources.limits.memory | quote }}
     persistence:
       persistentVolumeClaim:
         claimName: stackrox-db

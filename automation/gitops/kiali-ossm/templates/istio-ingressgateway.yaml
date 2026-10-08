@@ -73,7 +73,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "2"
 spec:
-  type: LoadBalancer
+  type: {{ .Values.istio.gatewayServiceType }}
   selector:
     istio: ingressgateway
   ports:
