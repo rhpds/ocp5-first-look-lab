@@ -10,7 +10,7 @@ gateway:
   namespace: openshift-ingress
   gatewayClassName: openshift-default
   tls:
-    clusterIssuer: zerossl-production-aws
+    clusterIssuer: acme-bifrost-production-ddns
 
 keycloak:
   realm: keycloak

@@ -6,6 +6,8 @@ adminPassword: ""
 
 clusterSubdomain: ""
 
+clusterIssuer: acme-bifrost-production-ddns
+
 vmScanning:
   enabled: true
 

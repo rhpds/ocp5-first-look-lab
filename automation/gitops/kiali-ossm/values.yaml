@@ -14,7 +14,7 @@ tempo:
 istio:
   namespace: istio-system
   cniNamespace: istio-cni
-  revision: default-v1-30-4
+  revision: default-v1-30-5
 
 s4:
   accessKeyId: s4admin

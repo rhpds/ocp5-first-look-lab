@@ -10,7 +10,7 @@ metadata:
 spec:
   secretName: central-default-tls-cert
   issuerRef:
-    name: zerossl-production-aws
+    name: {{ .Values.clusterIssuer }}
     kind: ClusterIssuer
     group: cert-manager.io
   dnsNames:
