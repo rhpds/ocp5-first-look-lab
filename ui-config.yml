@@ -16,8 +16,6 @@ tabs:
     port: 443
   - name: OpenShift Console
     url: 'https://console-openshift-console.${DOMAIN}'
-  - name: Red Hat Advanced Cluster Security
-    url: 'https://central-acs.${DOMAIN}'
     external: true
   - name: OpenShift GitOps
     url: 'https://openshift-gitops-server-openshift-gitops.${DOMAIN}'
