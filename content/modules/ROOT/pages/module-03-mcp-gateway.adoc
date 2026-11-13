@@ -36,6 +36,11 @@ Your environment includes:
 * *Team-based authorization* — `user1` (team-a: inventory + accounts) and `user2` (team-b: payments only) enforced via JWT claims
 * *Jaeger tracing* — distributed traces for every MCP request
 
+[IMPORTANT]
+====
+The MCP Gateway is part of Red Hat Connectivity Link (RHCL). A base OpenShift subscription includes RHCL entitlements for use with OpenShift Lightspeed MCP servers only. Using the MCP Gateway to front your own or third-party MCP servers — as demonstrated in these exercises with the mock inventory, payments, and accounts servers — requires a separate RHCL subscription.
+====
+
 == Before You Begin
 
 All commands in this section should be run in the *terminal on the right side* of this window.
